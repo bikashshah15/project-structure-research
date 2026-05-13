@@ -376,8 +376,41 @@ const ToolLink = ({ href, children }) => (
   </a>
 );
 
-/* Qualtrics URL placeholder chip — shown next to every Qualtrics-instrument node. */
+/* Qualtrics URL chips — live links replace placeholders as surveys are published. */
+const QUALTRICS_URLS = {
+  PRESCREENING: "https://surveys.qualtrics.charlotte.edu/jfe/form/SV_251K97hsA5JlGLk",
+
+  // Phase II/III — fill these as Surveys 2 and 3 are published
+  INTRO_GENA: null,
+  TLX_GENA: null,
+  INTRO_ANAA: null,
+  TLX_ANAA: null,
+  INTRO_GENB: null,
+  TLX_GENB: null,
+  INTRO_ANAB: null,
+  TLX_ANAB: null,
+
+  // Phase IV — fill these when Survey 4 is published
+  COMPARATIVE: null,
+  DEBRIEF: null,
+};
+
 function QualtricsPlaceholder({ slot }) {
+  const url = QUALTRICS_URLS[slot];
+
+  if (url) {
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mono text-[11px] bg-emerald-50 border border-emerald-300 text-emerald-900 px-1.5 py-0.5 rounded-sm hover:bg-emerald-100 transition-colors no-underline whitespace-nowrap"
+      >
+        Open Qualtrics · {slot} ↗
+      </a>
+    );
+  }
+
   return (
     <span className="mono text-[11px] bg-amber-50 border border-amber-300 text-amber-900 px-1.5 py-0.5 rounded-sm whitespace-nowrap">
       [QUALTRICS_{slot}_URL] — placeholder
