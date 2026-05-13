@@ -139,11 +139,10 @@
 
   /* ---------- Sticky design panel: full at top, compact while reading ---------- */
   .design-sticky {
-    transition: padding 280ms ease, background 280ms ease, box-shadow 280ms ease;
+    overflow-anchor: none;
+    transition: background 240ms ease, box-shadow 240ms ease;
   }
   .design-sticky[data-compact="true"] {
-    padding-top: 8px;
-    padding-bottom: 8px;
     box-shadow: 0 14px 30px -28px rgba(15, 23, 42, 0.65);
   }
   .design-matrix-card,
@@ -151,18 +150,17 @@
   .design-matrix-body,
   .design-matrix-hint {
     transition:
-      max-height 320ms ease,
-      opacity 220ms ease,
-      transform 320ms ease,
-      padding 320ms ease,
-      box-shadow 280ms ease,
-      border-color 280ms ease;
+      max-height 260ms ease,
+      opacity 180ms ease,
+      padding 260ms ease,
+      box-shadow 240ms ease,
+      border-color 240ms ease;
   }
   .design-matrix-body {
     max-height: 520px;
     opacity: 1;
     overflow: hidden;
-    transform: translateY(0);
+    overflow-anchor: none;
   }
   .design-sticky[data-compact="true"] .design-matrix-header {
     padding-top: 10px;
@@ -174,7 +172,6 @@
     padding-top: 0;
     padding-bottom: 0;
     pointer-events: none;
-    transform: translateY(-6px);
   }
   .design-sticky[data-compact="true"] .design-matrix-card {
     box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04), 0 14px 28px -24px rgba(15, 23, 42, 0.45);
@@ -1332,15 +1329,31 @@ function StudyFlow() {
 
   const [hover, setHover] = useState(null); // {gen, ana} | null
   const [designCompact, setDesignCompact] = useState(false);
+  const lastDesignToggleAt = useRef(0);
   const rootAttrs = {};
   if (hover?.gen) rootAttrs["data-gh"] = hover.gen;
   if (hover?.ana) rootAttrs["data-ah"] = hover.ana;
 
   useEffect(() => {
+    const COLLAPSE_AT = 140;
+    const EXPAND_AT = 12;
+    const TOGGLE_COOLDOWN_MS = 420;
     let ticking = false;
     const update = () => {
       ticking = false;
-      setDesignCompact(window.scrollY > 90);
+      const y = window.scrollY || document.documentElement.scrollTop || 0;
+      const now = window.performance ? window.performance.now() : Date.now();
+      setDesignCompact(prev => {
+        if (!prev && y > COLLAPSE_AT) {
+          lastDesignToggleAt.current = now;
+          return true;
+        }
+        if (prev && y < EXPAND_AT && now - lastDesignToggleAt.current > TOGGLE_COOLDOWN_MS) {
+          lastDesignToggleAt.current = now;
+          return false;
+        }
+        return prev;
+      });
     };
     const onScroll = () => {
       if (ticking) return;
