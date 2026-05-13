@@ -1,0 +1,2016 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Study Flow — Interactive</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ink: #0f172a;
+    --ink-soft: #334155;
+    --rule: #cbd5e1;
+    --rule-soft: #e2e8f0;
+    --paper: #fbfbf9;
+  }
+  html, body { background: var(--paper); color: var(--ink); }
+  body { font-family: 'IBM Plex Sans', system-ui, sans-serif; font-feature-settings: "ss01", "cv11"; }
+  .serif { font-family: 'Source Serif 4', Georgia, serif; }
+  .mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; }
+  /* Connector lines */
+  .conn-v { width: 1px; background: var(--rule); }
+  .conn-h { height: 1px; background: var(--rule); }
+  .arrow-down::after {
+    content: "";
+    position: absolute;
+    left: 50%; bottom: -1px;
+    transform: translate(-50%, 0);
+    width: 0; height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid var(--rule);
+  }
+  /* Diamond */
+  .diamond {
+    position: relative;
+    width: 220px;
+    height: 110px;
+  }
+  .diamond-inner {
+    position: absolute;
+    inset: 0;
+    transform: rotate(45deg);
+    border: 1.25px solid var(--ink);
+    background: #fff;
+  }
+  .diamond-label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 600;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    letter-spacing: 0.01em;
+  }
+  /* Phase band */
+  .band {
+    border-left: 3px solid var(--band-accent, #475569);
+    background: var(--band-bg, #f8fafc);
+  }
+  details > summary { list-style: none; cursor: pointer; }
+  details > summary::-webkit-details-marker { display: none; }
+  /* Hide focus outlines but keep keyboard ring */
+  button:focus-visible, [role="button"]:focus-visible { outline: 2px solid #0f172a; outline-offset: 2px; }
+  /* Subtle paper texture */
+  .paper-grid {
+    background-image:
+      linear-gradient(to right, rgba(15,23,42,0.025) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(15,23,42,0.025) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+  .num-tab {
+    font-family: 'Source Serif 4', serif;
+    font-variant-numeric: tabular-nums;
+  }
+  /* Smooth expand */
+  .node-detail { animation: expand 180ms ease-out; transform-origin: top; }
+  @keyframes expand {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ---------- Cell-hover highlighting of flow lanes ---------- */
+  .flow-root [data-lane] { transition: opacity 180ms ease, box-shadow 180ms ease, filter 180ms ease; }
+
+  /* A lane is highlighted iff (1) any generator is hovered AND lane matches it,
+     OR (2) any analyzer is hovered AND lane matches it.
+     Otherwise (when ANY hover is active) it's dimmed. */
+  .flow-root[data-gh] [data-lane="syft"]    { opacity: 0.22; filter: saturate(0.4); }
+  .flow-root[data-gh] [data-lane="vops"]    { opacity: 0.22; filter: saturate(0.4); }
+  .flow-root[data-ah] [data-lane="bombot"]  { opacity: 0.22; filter: saturate(0.4); }
+  .flow-root[data-ah] [data-lane="trust"]   { opacity: 0.22; filter: saturate(0.4); }
+  .flow-root[data-gh="syft"]   [data-lane="syft"],
+  .flow-root[data-gh="vops"]   [data-lane="vops"],
+  .flow-root[data-ah="bombot"] [data-lane="bombot"],
+  .flow-root[data-ah="trust"]  [data-lane="trust"] {
+    opacity: 1; filter: none;
+  }
+  .flow-root[data-gh="syft"]   [data-lane="syft"] .lane-card,
+  .flow-root[data-gh="vops"]   [data-lane="vops"] .lane-card,
+  .flow-root[data-ah="bombot"] [data-lane="bombot"] .lane-card,
+  .flow-root[data-ah="trust"]  [data-lane="trust"] .lane-card {
+    box-shadow: 0 0 0 2px var(--hl, #1d4ed8), 0 6px 24px -10px rgba(29,78,216,0.35);
+    border-radius: 2px;
+  }
+  .flow-root[data-gh="syft"]   [data-lane="syft"] .lane-tag,
+  .flow-root[data-gh="vops"]   [data-lane="vops"] .lane-tag,
+  .flow-root[data-ah="bombot"] [data-lane="bombot"] .lane-tag,
+  .flow-root[data-ah="trust"]  [data-lane="trust"] .lane-tag {
+    background: var(--hl, #1d4ed8) !important;
+    color: #fff !important;
+    border-color: var(--hl, #1d4ed8) !important;
+  }
+
+  /* Matrix cell */
+  .cell {
+    border: 1px solid var(--rule);
+    background: #fff;
+    transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+    cursor: pointer;
+  }
+  .cell:hover, .cell[data-active="true"] {
+    border-color: var(--hl, #1d4ed8);
+    background: color-mix(in oklab, var(--hl, #1d4ed8) 6%, #fff);
+  }
+  .cell-bar {
+    height: 4px; border-radius: 2px;
+    background: linear-gradient(to right, var(--hl, #1d4ed8) 0 50%, var(--hl2, #6d28d9) 50% 100%);
+  }
+
+  /* ---------- Walkthrough avatar + active node ---------- */
+  .walk-active { position: relative; }
+  .walk-active > .lane-card,
+  .walk-active .lane-card {
+    box-shadow: 0 0 0 3px #f59e0b, 0 14px 36px -14px rgba(245,158,11,0.55) !important;
+    background: #fffbeb !important;
+    border-color: #f59e0b !important;
+  }
+  .walk-avatar {
+    position: absolute;
+    left: -34px; top: 18px;
+    width: 22px; height: 22px;
+    border-radius: 999px;
+    background: radial-gradient(circle at 35% 30%, #fcd34d 0%, #f59e0b 60%, #b45309 100%);
+    box-shadow: 0 0 0 4px rgba(245,158,11,0.22), 0 0 0 9px rgba(245,158,11,0.10);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 11px; font-weight: 700;
+    z-index: 5;
+    animation: walk-pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes walk-pulse {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.15); }
+  }
+
+  /* ---------- Acronym tooltip styling ---------- */
+  abbr.acr {
+    text-decoration: underline dotted #94a3b8;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    cursor: help;
+  }
+  abbr.acr:hover { text-decoration-color: #0f172a; color: #0f172a; }
+
+  /* ---------- Phase entrance animation ---------- */
+  .phase-enter { animation: phase-in 520ms cubic-bezier(.2,.7,.2,1) both; }
+  .phase-enter-1 { animation-delay: 0ms; }
+  .phase-enter-2 { animation-delay: 90ms; }
+  .phase-enter-3 { animation-delay: 180ms; }
+  .phase-enter-4 { animation-delay: 270ms; }
+  @keyframes phase-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .phase-enter { animation: none !important; }
+    .node-detail { animation: none !important; }
+  }
+
+  /* ---------- Projector / 1080p readability ---------- */
+  @media (min-width: 1500px) {
+    .stage-root { max-width: 1240px !important; }
+    body { font-size: 16px; }
+  }
+
+  /* ---------- Print / PDF export ---------- */
+  @media print {
+    @page { size: A3 portrait; margin: 18mm 14mm; }
+    html, body { background: #fff !important; }
+    body { font-size: 11pt; }
+    .no-print, .no-print * { display: none !important; }
+    .sticky { position: static !important; }
+    .flow-root { display: block !important; }
+    /* expand every collapsed node so committees can read it on paper */
+    .node-detail { display: block !important; animation: none !important; }
+    .lane-card { break-inside: avoid; page-break-inside: avoid; box-shadow: none !important; }
+    .band { break-inside: avoid-page; }
+    section.band { page-break-inside: avoid; }
+    section.band + section.band { page-break-before: always; }
+    .phase-enter { animation: none !important; opacity: 1 !important; transform: none !important; }
+    /* Hide hover-dimming so the printed copy shows every lane crisp */
+    .flow-root[data-gh] [data-lane],
+    .flow-root[data-ah] [data-lane] { opacity: 1 !important; filter: none !important; }
+    .walk-active > .lane-card,
+    .walk-active .lane-card { background: #fff !important; box-shadow: none !important; }
+    .walk-avatar { display: none !important; }
+    abbr.acr { text-decoration: none; color: inherit; cursor: text; }
+    /* surface tooltip content as inline footnote on print */
+    abbr.acr::after { content: " (" attr(title) ")"; font-size: 0.78em; color: #475569; font-style: italic; }
+    a { color: inherit; text-decoration: none; }
+  }
+  .walk-strip {
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    border-radius: 2px;
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+/*  SCREENSHOT WORKFLOW
+    1. Create a ./screenshots/ directory next to this HTML file.
+    2. Capture the screens per Appendix A in the prompt pack.
+    3. Save with the filenames listed in SCREENSHOT_MAP.
+    4. Reload the HTML — the slots will populate automatically.
+    5. Participant session captures stay separate as P##_B#_scrN.png. */
+const { useState, useMemo, useCallback, useEffect, useRef, Fragment } = React;
+
+/* ------------------------------------------------------------------ */
+/* Inline lucide-style icons (24x24, currentColor, 1.5 stroke)         */
+/* ------------------------------------------------------------------ */
+const Svg = ({ children, className = "w-4 h-4" }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+       className={className} aria-hidden="true">{children}</svg>
+);
+const I = {
+  Users:        (p) => <Svg {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></Svg>,
+  ClipboardList:(p) => <Svg {...p}><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></Svg>,
+  Filter:       (p) => <Svg {...p}><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></Svg>,
+  CalendarCheck:(p) => <Svg {...p}><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="m9 16 2 2 4-4"/></Svg>,
+  Mic:          (p) => <Svg {...p}><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 19v3"/></Svg>,
+  Server:       (p) => <Svg {...p}><rect x="2" y="3" width="20" height="8" rx="2"/><rect x="2" y="13" width="20" height="8" rx="2"/><path d="M6 7h.01M6 17h.01"/></Svg>,
+  Grid2x2:      (p) => <Svg {...p}><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 12h18M12 3v18"/></Svg>,
+  FileText:     (p) => <Svg {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></Svg>,
+  Terminal:     (p) => <Svg {...p}><path d="m4 17 6-6-6-6"/><path d="M12 19h8"/></Svg>,
+  Globe:        (p) => <Svg {...p}><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 0 20 15.3 15.3 0 0 1 0-20z"/></Svg>,
+  Play:         (p) => <Svg {...p}><polygon points="6 3 20 12 6 21 6 3"/></Svg>,
+  Download:     (p) => <Svg {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></Svg>,
+  Save:         (p) => <Svg {...p}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></Svg>,
+  Gauge:        (p) => <Svg {...p}><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></Svg>,
+  Upload:       (p) => <Svg {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></Svg>,
+  Bug:          (p) => <Svg {...p}><path d="m8 2 1.88 1.88"/><path d="M14.12 3.88 16 2"/><path d="M9 7.13v-1a3.003 3.003 0 1 1 6 0v1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6"/><path d="M12 20v-9"/></Svg>,
+  MessageCircle:(p) => <Svg {...p}><path d="M21 12a9 9 0 1 1-3.6-7.2L21 3l-1.2 3.6A9 9 0 0 1 21 12z"/></Svg>,
+  ShieldCheck:  (p) => <Svg {...p}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></Svg>,
+  FolderPlus:   (p) => <Svg {...p}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="M12 11v6M9 14h6"/></Svg>,
+  ListChecks:   (p) => <Svg {...p}><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8M13 12h8M13 18h8"/></Svg>,
+  Wrench:       (p) => <Svg {...p}><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4L15 12l-3-3z"/></Svg>,
+  Search:       (p) => <Svg {...p}><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></Svg>,
+  Pause:        (p) => <Svg {...p}><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></Svg>,
+  Repeat:       (p) => <Svg {...p}><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></Svg>,
+  BookOpen:     (p) => <Svg {...p}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></Svg>,
+  Gift:         (p) => <Svg {...p}><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></Svg>,
+  Flag:         (p) => <Svg {...p}><path d="M4 22V4"/><path d="M4 4h14l-3 5 3 5H4"/></Svg>,
+  X:            (p) => <Svg {...p}><path d="M18 6 6 18M6 6l12 12"/></Svg>,
+  ChevronDown:  (p) => <Svg {...p}><path d="m6 9 6 6 6-6"/></Svg>,
+  Camera:       (p) => <Svg {...p}><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></Svg>,
+  Hash:         (p) => <Svg {...p}><path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/></Svg>,
+};
+
+/* ------------------------------------------------------------------ */
+/* Phase tokens                                                        */
+/* ------------------------------------------------------------------ */
+const PHASES = {
+  P1: { id:"P1", num:"I",  name:"Screening & Setup",        accent:"#475569", bg:"#f1f5f9", chip:"#e2e8f0", text:"#334155" },
+  P2: { id:"P2", num:"II", name:"Block 1 — Generator + Analyzer", accent:"#1d4ed8", bg:"#eff6ff", chip:"#dbeafe", text:"#1e3a8a" },
+  P3: { id:"P3", num:"III",name:"Block 2 — Generator + Analyzer", accent:"#6d28d9", bg:"#f5f3ff", chip:"#ede9fe", text:"#5b21b6" },
+  P4: { id:"P4", num:"IV", name:"Debrief & Wrap-up",        accent:"#047857", bg:"#ecfdf5", chip:"#d1fae5", text:"#065f46" },
+};
+
+/* ------------------------------------------------------------------ */
+/* Tool URLs (single source of truth for participant links)            */
+/* ------------------------------------------------------------------ */
+const TOOL_URLS = {
+  bombot: "https://bombot.vercel.app",
+  trustify: "https://d3nclnp83x4i9u.cloudfront.net",
+  trustify_fallback: "http://trustify-alb-1552640144.us-east-1.elb.amazonaws.com",
+  vops: "https://sb-3f097adefd5441e6a813b9188d25adbe.ecs.us-east-1.on.aws",
+  vops_endpoint: "https://sb-3f097adefd5441e6a813b9188d25adbe.ecs.us-east-1.on.aws/api/sbom",
+};
+
+/* ------------------------------------------------------------------ */
+/* Real screenshot file mapping (researcher drops PNGs into ./screenshots/) */
+/* ------------------------------------------------------------------ */
+const SCREENSHOT_MAP = {
+  // Block 1 — Generator
+  "syft cli prompt":       "./screenshots/01_syft_cli.png",
+  "output file":           "./screenshots/02_syft_spdx_output.png",
+  "V-Ops landing":         "./screenshots/03_vops_landing.png",
+  "V-Ops run page":        "./screenshots/04_vops_run_page.png",
+  "artifact":              "./screenshots/05_vops_artifact.png",
+  // Block 1 — Analyzer
+  "upload state":          "./screenshots/06_bombot_upload.png",
+  "chat answer":           "./screenshots/07_bombot_chat_answer.png",
+  "remediation":           "./screenshots/08_bombot_remediation.png",
+  "trustify dashboard":    "./screenshots/09_trustify_dashboard.png",
+  "trustify sbom list":    "./screenshots/10_trustify_sbom_list.png",
+  "trustify vuln detail":  "./screenshots/11_trustify_vuln_detail.png",
+};
+const ToolLink = ({ href, children }) => (
+  <a href={href} target="_blank" rel="noopener" className="mono text-blue-700 underline decoration-blue-400/60 hover:decoration-blue-700">
+    {children || href}
+  </a>
+);
+
+/* Qualtrics URL placeholder chip — shown next to every Qualtrics-instrument node. */
+function QualtricsPlaceholder({ slot }) {
+  return (
+    <span className="mono text-[11px] bg-amber-50 border border-amber-300 text-amber-900 px-1.5 py-0.5 rounded-sm whitespace-nowrap">
+      [QUALTRICS_{slot}_URL] — placeholder
+    </span>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Re-usable primitives                                                */
+/* ------------------------------------------------------------------ */
+
+const Connector = ({ h = 20 }) => (
+  <div className="relative mx-auto arrow-down conn-v" style={{ height: h }} />
+);
+const ConnectorPlain = ({ h = 20 }) => (
+  <div className="conn-v mx-auto" style={{ height: h }} />
+);
+
+/* A clickable node card */
+/* ------------------------------------------------------------------ */
+/* Instrument-battery previews                                          */
+/* ------------------------------------------------------------------ */
+function PlaceholderTag() {
+  return (
+    <span className="mono text-[9.5px] uppercase tracking-[0.10em] px-1.5 py-[1px] rounded-sm bg-amber-50 text-amber-900 border border-amber-300 whitespace-nowrap">
+      [PLACEHOLDER — confirm with PI]
+    </span>
+  );
+}
+
+function TlxScale({ anchors }) {
+  return (
+    <div className="mt-1.5">
+      <div className="flex justify-between text-[10px] mono text-slate-500 mb-0.5">
+        <span>{anchors[0]}</span>
+        <span className="text-slate-400">0 — 100 (raw, 5-pt increments)</span>
+        <span>{anchors[1]}</span>
+      </div>
+      <div className="relative h-2.5 bg-slate-50 border border-slate-300 rounded-[1px]">
+        {Array.from({ length: 21 }).map((_, i) => (
+          <span key={i}
+                className={"absolute top-0 bottom-0 " + (i % 5 === 0 ? "w-px bg-slate-500" : "w-px bg-slate-300")}
+                style={{ left: (i / 20) * 100 + "%" }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TlxBattery({ scope, slot }) {
+  const items = [
+    { name: "Mental Demand",   q: "How mentally demanding was the task?",                                                  anchors: ["Very Low", "Very High"] },
+    { name: "Physical Demand", q: "How physically demanding was the task?",                                                anchors: ["Very Low", "Very High"] },
+    { name: "Temporal Demand", q: "How hurried or rushed was the pace of the task?",                                       anchors: ["Very Low", "Very High"] },
+    { name: "Performance",     q: "How successful were you in accomplishing what you were asked to do?",                   anchors: ["Perfect", "Failure"] },
+    { name: "Effort",          q: "How hard did you have to work to accomplish your level of performance?",                anchors: ["Very Low", "Very High"] },
+    { name: "Frustration",     q: "How insecure, discouraged, irritated, stressed and annoyed were you during the task?", anchors: ["Very Low", "Very High"] },
+  ];
+  return (
+    <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center gap-2 flex-wrap text-[12.5px] text-slate-700">
+        <span className="serif font-semibold text-slate-900">NASA-TLX + Trust + Perceived Success — Qualtrics:</span>
+        {slot && <QualtricsPlaceholder slot={slot} />}
+      </div>
+      <div>
+        <div className="flex items-center gap-2 text-[10.5px] uppercase tracking-[0.14em] text-slate-500 font-semibold mb-1.5">
+          <span>NASA-TLX (raw) · 6 items · 0–100 raw scale (5-pt increments) · administered for {scope}</span>
+        </div>
+        <div className="space-y-2">
+          {items.map(it => (
+            <div key={it.name} className="bg-white border border-slate-200 rounded-sm px-3 py-2">
+              <div className="flex items-baseline gap-2 flex-wrap">
+                <span className="serif text-[13px] font-semibold text-slate-900">{it.name}</span>
+                <span className="text-[11.5px] text-slate-600 leading-snug">— {it.q}</span>
+              </div>
+              <TlxScale anchors={it.anchors} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-sm px-3 py-2">
+        <div className="text-[10.5px] uppercase tracking-[0.14em] text-slate-500 font-semibold mb-1">Trust · 1 item · 7-pt Likert</div>
+        <div className="text-[12.5px] text-slate-800 serif">“I trust the output produced by <span className="not-italic font-semibold">{scope}</span>.”</div>
+        <div className="text-[10.5px] mono text-slate-500 mt-1">Strongly disagree (1) — Neutral (4) — Strongly agree (7)</div>
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-sm px-3 py-2">
+        <div className="text-[10.5px] uppercase tracking-[0.14em] text-slate-500 font-semibold mb-1">Perceived success · 1 item · 7-pt Likert</div>
+        <div className="text-[12.5px] text-slate-800 serif">“I am confident I completed the task correctly.”</div>
+        <div className="text-[10.5px] mono text-slate-500 mt-1">Strongly disagree (1) — Neutral (4) — Strongly agree (7)</div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Screenshot placeholders                                              */
+/* ------------------------------------------------------------------ */
+const SHOT_MONO = { fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: "8px", lineHeight: 1.45 };
+
+function ShotChrome({ chrome, children }) {
+  return (
+    <div className="w-full h-full flex flex-col">
+      {chrome && (
+        <div className="flex items-center gap-1 px-1.5 py-1 bg-slate-100 border-b border-slate-200">
+          <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+          <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+          <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+          <span className="ml-2 mono text-[8px] text-slate-500 truncate">{chrome}</span>
+        </div>
+      )}
+      <div className="flex-1 min-h-0">{children}</div>
+    </div>
+  );
+}
+
+/* RealShot — load ./screenshots/<file>.png with a missing-file placeholder. */
+function RealShot({ kind }) {
+  const src = SCREENSHOT_MAP[kind];
+  const [missing, setMissing] = useState(false);
+  if (missing) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-amber-50 border border-dashed border-amber-300 text-amber-900 px-2 py-1 text-center">
+        <div>
+          <div className="mono text-[10px] uppercase tracking-[0.12em] font-semibold mb-0.5">screenshot missing</div>
+          <div className="mono text-[10px] text-amber-800 break-all">{src}</div>
+          <div className="mono text-[9.5px] text-amber-700 mt-1">drop the PNG here and reload</div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <img
+      src={src}
+      alt={kind}
+      loading="lazy"
+      className="w-full h-full object-contain bg-white"
+      onError={() => setMissing(true)}
+    />
+  );
+}
+
+function renderShot(kind) {
+  /* Prefer a real screenshot if we have a mapping for this kind. */
+  if (SCREENSHOT_MAP[kind]) {
+    return <RealShot kind={kind} />;
+  }
+  /* Otherwise fall back to the original stylized mock. */
+  switch (kind) {
+    case "terminal": return (
+      <div className="w-full h-full bg-[#0b1020] text-[#86efac] p-2" style={SHOT_MONO}>
+        <div className="text-slate-300">$ cd ~/study/repo</div>
+        <div className="text-slate-300">$ syft . -o spdx-json {">"} sbom.spdx.json</div>
+        <div>✓ cataloged 247 packages (npm, python, debian)</div>
+        <div className="text-slate-300">$ ls -la sbom.spdx.json</div>
+        <div className="text-slate-300">-rw-r--r-- p staff 324K sbom.spdx.json</div>
+        <div className="text-slate-300">$ <span className="inline-block w-1 h-2 bg-slate-300 align-middle"></span></div>
+      </div>
+    );
+    case "output file": return (
+      <ShotChrome chrome="sbom.spdx.json — VS Code">
+        <div className="bg-white text-slate-800 p-2" style={SHOT_MONO}>
+          <div className="text-slate-500">1  {"{"}</div>
+          <div className="text-slate-700">2    "spdxVersion": "SPDX-2.3",</div>
+          <div className="text-slate-700">3    "name": "study/repo",</div>
+          <div className="text-slate-700">4    "documentNamespace": "https://…",</div>
+          <div className="text-slate-700">5    "packages": [</div>
+          <div className="text-slate-500">6      {"{ name: 'lodash', version: '4.17.20', … }"}</div>
+          <div className="text-slate-500">7      {"{ name: 'express', version: '4.18.2', … }"}</div>
+          <div className="text-slate-500">8      … 245 more</div>
+          <div className="text-slate-700">9    ]</div>
+          <div className="text-slate-500">10 {"}"}</div>
+        </div>
+      </ShotChrome>
+    );
+    case "V-Ops run page": return (
+      <ShotChrome chrome="v-ops.cloud — runs / #4821">
+        <div className="bg-white p-2" style={SHOT_MONO}>
+          <div className="flex items-center gap-1.5 mb-1">
+            <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 px-1 rounded-sm">● running</span>
+            <span className="text-slate-600">repo: study/repo · branch: main</span>
+          </div>
+          <div className="bg-slate-50 border border-slate-200 rounded-sm p-1.5 space-y-0.5">
+            <div className="text-slate-500">[14:02:11] init container</div>
+            <div className="text-slate-500">[14:02:18] pull dependency tree…</div>
+            <div className="text-slate-500">[14:02:22] generate sbom (cdx-json)</div>
+            <div className="text-slate-700">[14:02:24] ✓ 247 components</div>
+            <div className="text-slate-500">[14:02:24] signing artefact…</div>
+          </div>
+        </div>
+      </ShotChrome>
+    );
+    case "artifact": return (
+      <ShotChrome chrome="v-ops.cloud — artefacts">
+        <div className="bg-white p-2" style={SHOT_MONO}>
+          <div className="text-slate-500 mb-1">Run #4821 · 1 artefact</div>
+          <div className="border border-slate-300 rounded-sm p-1.5 flex items-center gap-2">
+            <span className="w-3 h-3 bg-slate-200 border border-slate-300 rounded-[1px]"></span>
+            <div className="flex-1">
+              <div className="text-slate-800">sbom-4821.cdx.json</div>
+              <div className="text-slate-500">324 KB · SHA256 9f3…b2c</div>
+            </div>
+            <span className="border border-slate-400 px-1 rounded-sm">Download ↓</span>
+          </div>
+          <div className="text-slate-400 mt-1">DOI: 10.5281/zenodo.4821</div>
+        </div>
+      </ShotChrome>
+    );
+    case "upload state": return (
+      <ShotChrome chrome="bombot.app — chat">
+        <div className="bg-white p-2 h-full flex flex-col" style={SHOT_MONO}>
+          <div className="text-slate-500 mb-1">New SBOM</div>
+          <div className="border border-dashed border-slate-400 rounded-sm flex-1 flex items-center justify-center bg-slate-50">
+            <div className="text-center">
+              <div className="text-slate-700">✓ sbom.spdx.json</div>
+              <div className="text-slate-500">324 KB · parsed 247 packages</div>
+            </div>
+          </div>
+          <div className="bg-slate-900 text-slate-100 mt-1 px-1.5 py-0.5 rounded-sm w-fit">analysing…</div>
+        </div>
+      </ShotChrome>
+    );
+    case "chat answer": return (
+      <ShotChrome chrome="bombot.app — chat">
+        <div className="bg-white p-2 space-y-1" style={SHOT_MONO}>
+          <div className="bg-slate-100 rounded-sm px-1.5 py-1 w-fit max-w-[80%] text-slate-700">Which dependency is most vulnerable?</div>
+          <div className="bg-blue-50 border border-blue-200 rounded-sm px-1.5 py-1 max-w-[90%] text-slate-800">
+            <div><b>lodash 4.17.20</b> — 3 CVEs</div>
+            <div className="text-slate-600">• CVE-2021-23337 (high · prototype pollution)</div>
+            <div className="text-slate-600">• CVE-2020-28500 (medium · ReDoS)</div>
+            <div className="text-slate-600">• CVE-2020-8203 (high · prototype pollution)</div>
+          </div>
+        </div>
+      </ShotChrome>
+    );
+    case "remediation": return (
+      <ShotChrome chrome="bombot.app — chat">
+        <div className="bg-white p-2 space-y-1" style={SHOT_MONO}>
+          <div className="bg-slate-100 rounded-sm px-1.5 py-1 w-fit text-slate-700">How do I fix it?</div>
+          <div className="bg-blue-50 border border-blue-200 rounded-sm px-1.5 py-1 text-slate-800">
+            <div>Upgrade to <b>lodash ≥ 4.17.21</b>.</div>
+            <div className="bg-slate-900 text-slate-100 rounded-sm px-1.5 py-0.5 mt-1">npm install lodash@4.17.21</div>
+            <div className="text-slate-600 mt-0.5">Re-run SBOM after upgrade to confirm.</div>
+          </div>
+        </div>
+      </ShotChrome>
+    );
+    case "trustify dashboard": return (
+      <ShotChrome chrome="trustify — dashboard">
+        <div className="bg-white p-2 flex items-center justify-center h-full text-slate-400 mono text-[11px]">
+          [ upload screenshot here — see Capture Plan ]
+        </div>
+      </ShotChrome>
+    );
+    case "trustify sbom list": return (
+      <ShotChrome chrome="trustify — sboms">
+        <div className="bg-white p-2 flex items-center justify-center h-full text-slate-400 mono text-[11px]">
+          [ upload screenshot here — see Capture Plan ]
+        </div>
+      </ShotChrome>
+    );
+    case "trustify vuln detail": return (
+      <ShotChrome chrome="trustify — vulnerability detail">
+        <div className="bg-white p-2 flex items-center justify-center h-full text-slate-400 mono text-[11px]">
+          [ upload screenshot here — see Capture Plan ]
+        </div>
+      </ShotChrome>
+    );
+    default: return (
+      <div className="w-full h-full bg-slate-50 flex items-center justify-center text-[10px] mono text-slate-400">placeholder</div>
+    );
+  }
+}
+
+function ShotPreview({ kind, n }) {
+  return (
+    <figure className="my-1 inline-flex flex-col border border-slate-300 bg-white rounded-sm overflow-hidden align-top">
+      <figcaption className="bg-slate-100/70 border-b border-slate-200 px-2 py-1 flex items-center gap-2 text-[11px]">
+        <I.Camera className="w-3 h-3 text-slate-500" />
+        <span className="num-tab uppercase tracking-[0.14em] text-slate-500 text-[10px]">Screenshot {n}</span>
+        <span className="serif italic text-slate-700">{kind}</span>
+        <span className="ml-auto mono text-[9.5px] text-slate-400 uppercase tracking-[0.12em]">placeholder</span>
+      </figcaption>
+      <div className="w-[300px] h-[170px] bg-white">{renderShot(kind)}</div>
+      <div className="px-2 py-1 border-t border-slate-200 bg-slate-50 mono text-[9.5px] text-slate-500 leading-snug space-y-0.5">
+        <div>expected: <span className="text-slate-700 break-all">{SCREENSHOT_MAP[kind] || `./screenshots/scr${n}__${(kind||"unknown").replace(/\s+/g,"_")}.png`}</span></div>
+        <div>participant capture: <span className="text-slate-700">P##_B#_scr{n}.png</span></div>
+      </div>
+    </figure>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Acronym tooltip                                                      */
+/* ------------------------------------------------------------------ */
+const ACR = {
+  SBOM:       "Software Bill of Materials — machine-readable inventory of every component in a software build.",
+  SPDX:       "Software Package Data Exchange — ISO/IEC 5962 standard SBOM format (Linux Foundation).",
+  CycloneDX:  "OWASP SBOM and security exchange format (cdx-json).",
+  CVE:        "Common Vulnerabilities and Exposures — public identifier for a software vulnerability.",
+  CVSS:       "Common Vulnerability Scoring System — 0–10 numeric severity for a CVE.",
+  DOI:        "Digital Object Identifier — persistent reference for an archived digital artifact.",
+  SIS:        "Study Information Sheet — IRB-approved one-pager sent to participants before the session.",
+  "NASA-TLX": "NASA Task Load Index — 6-item subjective workload instrument (mental, physical, temporal demand; performance; effort; frustration).",
+  TLX:        "NASA Task Load Index — 6-item subjective workload instrument.",
+  IRB:        "Institutional Review Board — human-subjects research ethics oversight committee.",
+  ReDoS:      "Regular-expression Denial of Service — vulnerability class.",
+  UNCC:       "University of North Carolina at Charlotte.",
+  SWE:        "Software Engineer.",
+};
+function Acr({ code, children }) {
+  const label = children || code;
+  return <abbr className="acr" title={ACR[code] || code}>{label}</abbr>;
+}
+
+function Node({ id, icon:Icon, title, sub, screenshot, tone="neutral", expanded, onToggle, detail, instrument, dashed=false, dim=false, terminal=false }) {
+  const shotMatch = screenshot ? /scr\.\s*(\d+)\s*[—-]\s*(.+)/.exec(screenshot) : null;
+  const shotNum = shotMatch?.[1];
+  const shotKind = shotMatch?.[2]?.trim();
+  const toneCls = {
+    neutral: "bg-white border-slate-900/80",
+    blue:    "bg-white border-blue-900/70",
+    indigo:  "bg-white border-indigo-900/70",
+    emerald: "bg-white border-emerald-900/70",
+    slate:   "bg-white border-slate-700",
+    danger:  "bg-white border-slate-400",
+  }[tone];
+
+  return (
+    <div className="w-full">
+      <button
+        type="button"
+        onClick={() => onToggle && onToggle(id)}
+        aria-expanded={!!expanded}
+        className={`lane-card group w-full text-left ${toneCls} ${dashed ? "border-dashed" : ""} ${dim ? "opacity-70" : ""} ${terminal ? "rounded-full" : "rounded-sm"} border px-4 py-3 transition-all hover:shadow-[0_1px_0_0_rgba(15,23,42,0.08),0_8px_24px_-12px_rgba(15,23,42,0.25)] hover:border-slate-900`}
+      >
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 shrink-0 text-slate-700">
+            <Icon className="w-[18px] h-[18px]" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="serif font-semibold text-[15px] leading-tight text-slate-900">{title}</span>
+              {instrument && (
+                <span className="text-[10.5px] uppercase tracking-[0.12em] text-slate-500 font-medium">{instrument}</span>
+              )}
+            </div>
+            {sub && <div className="text-[12.5px] text-slate-600 leading-snug mt-0.5">{sub}</div>}
+            {screenshot && (
+              <div className="mt-1.5 inline-flex items-center gap-1 text-[10.5px] mono text-slate-500">
+                <I.Camera className="w-3 h-3" /> {screenshot}
+              </div>
+            )}
+          </div>
+          <div className="shrink-0 text-slate-400 group-hover:text-slate-700 transition-colors">
+            <I.ChevronDown className={`w-4 h-4 transition-transform ${expanded ? "rotate-180" : ""}`} />
+          </div>
+        </div>
+        {expanded && (detail || shotKind) && (
+          <div className="node-detail mt-3 pl-[30px] pr-1">
+            <div className="border-l border-slate-300 pl-3 text-[12.5px] leading-relaxed text-slate-700 space-y-2">
+              {shotKind && <ShotPreview kind={shotKind} n={shotNum} />}
+              {detail}
+            </div>
+          </div>
+        )}
+      </button>
+    </div>
+  );
+}
+
+/* A decision diamond with two side-by-side outgoing labels */
+function Diamond({ label, leftLabel, rightLabel, leftTone="ink", rightTone="ink" }) {
+  const toneColor = (t) =>
+    t === "danger" ? "text-slate-500" : t === "accent" ? "text-slate-900" : "text-slate-900";
+  return (
+    <div className="flex flex-col items-center">
+      <div className="diamond">
+        <div className="diamond-inner"></div>
+        <div className="diamond-label px-3 text-center">{label}</div>
+      </div>
+      <div className="flex items-stretch w-full">
+        <div className="flex-1 flex flex-col items-center">
+          <div className="conn-v" style={{ height: 18 }} />
+          <span className={`mono text-[11px] ${toneColor(leftTone)} px-1.5 py-0.5 bg-[var(--paper)] -my-2 z-10`}>
+            {leftLabel}
+          </span>
+          <div className="conn-v arrow-down relative" style={{ height: 16 }} />
+        </div>
+        <div className="flex-1 flex flex-col items-center">
+          <div className="conn-v" style={{ height: 18 }} />
+          <span className={`mono text-[11px] ${toneColor(rightTone)} px-1.5 py-0.5 bg-[var(--paper)] -my-2 z-10`}>
+            {rightLabel}
+          </span>
+          <div className="conn-v arrow-down relative" style={{ height: 16 }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* Phase wrapper */
+function PhaseBand({ phase, children, defaultOpen=true }) {
+  const phaseN = { P1:1, P2:2, P3:3, P4:4 }[phase.id] || 1;
+  return (
+    <section
+      className={"relative band rounded-sm phase-enter phase-enter-" + phaseN}
+      style={{ "--band-bg": phase.bg, "--band-accent": phase.accent }}
+    >
+      <header className="px-5 pt-4 pb-2 flex items-baseline gap-3">
+        <span className="num-tab text-[11px] tracking-[0.18em] font-semibold uppercase"
+              style={{ color: phase.accent }}>
+          Phase&nbsp;{phase.num}
+        </span>
+        <h2 className="serif text-[17px] font-semibold" style={{ color: phase.text }}>
+          {phase.name}
+        </h2>
+        <span className="ml-auto text-[10.5px] uppercase tracking-[0.14em] text-slate-500">
+          {phase.id === "P1" && "Recruitment · Eligibility · Setup"}
+          {phase.id === "P2" && <>Generator A · Analyzer A · <Acr code="NASA-TLX" /></>}
+          {phase.id === "P3" && <>Generator B · Analyzer B · <Acr code="NASA-TLX" /></>}
+          {phase.id === "P4" && "Comparative · Debrief · Compensation"}
+        </span>
+      </header>
+      <div className="px-5 pb-5">{children}</div>
+    </section>
+  );
+}
+
+/* Two-column lane container for parallel paths */
+function TwoLanes({ left, right, leftHeader, rightHeader, leftLane, rightLane, accent="#1d4ed8", axis="gen" }) {
+  return (
+    <div className="grid grid-cols-2 gap-6 relative">
+      <div className="flex flex-col items-stretch gap-3" data-lane={leftLane} data-axis={axis}>
+        <LaneHeader label={leftHeader} accent={accent} />
+        {left}
+      </div>
+      <div className="flex flex-col items-stretch gap-3" data-lane={rightLane} data-axis={axis}>
+        <LaneHeader label={rightHeader} accent={accent} />
+        {right}
+      </div>
+    </div>
+  );
+}
+function LaneHeader({ label, accent }) {
+  return (
+    <div className="flex items-center gap-2 -mb-1">
+      <span
+        className="lane-tag mono text-[10.5px] uppercase tracking-[0.16em] px-2 py-0.5 rounded-sm border"
+        style={{ color: accent, borderColor: accent + "55", background: "#ffffff" }}
+      >
+        {label}
+      </span>
+      <span className="h-px flex-1 bg-slate-300" />
+    </div>
+  );
+}
+
+/* Vertical connector between stacked nodes */
+function VStack({ children, gap=14 }) {
+  const arr = React.Children.toArray(children).filter(Boolean);
+  return (
+    <div className="flex flex-col items-stretch">
+      {arr.map((c, i) => (
+        <div key={i} className="contents">
+          {c}
+          {i < arr.length - 1 && <Connector h={gap} />}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* Merge bracket: two columns converge to one center point */
+function MergeIn({ accent="#1d4ed8" }) {
+  return (
+    <div className="relative h-10 grid grid-cols-2">
+      {/* left vertical stub */}
+      <div className="relative">
+        <div className="absolute left-1/2 top-0 bottom-1/2 w-px bg-slate-300" />
+        <div className="absolute left-1/2 right-0 top-1/2 h-px bg-slate-300" />
+      </div>
+      {/* right vertical stub */}
+      <div className="relative">
+        <div className="absolute left-1/2 top-0 bottom-1/2 w-px bg-slate-300" />
+        <div className="absolute left-0 right-1/2 top-1/2 h-px bg-slate-300" />
+      </div>
+      {/* center down */}
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 w-px bg-slate-300" style={{ height: "calc(50% - 1px)" }} />
+      <div className="absolute left-1/2 bottom-0 -translate-x-1/2 arrow-down" />
+    </div>
+  );
+}
+
+/* Split bracket: one center to two columns (used for diamond → lanes spreading) */
+function SplitOut() {
+  return (
+    <div className="relative h-8 grid grid-cols-2">
+      <div className="relative">
+        <div className="absolute left-1/2 right-0 top-0 h-px bg-slate-300" />
+        <div className="absolute left-1/2 top-0 bottom-0 w-px bg-slate-300" />
+        <div className="absolute left-1/2 bottom-0 -translate-x-1/2 arrow-down" />
+      </div>
+      <div className="relative">
+        <div className="absolute left-0 right-1/2 top-0 h-px bg-slate-300" />
+        <div className="absolute left-1/2 top-0 bottom-0 w-px bg-slate-300" />
+        <div className="absolute left-1/2 bottom-0 -translate-x-1/2 arrow-down" />
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Legend                                                              */
+/* ------------------------------------------------------------------ */
+function Legend() {
+  return (
+    <div className="border border-slate-300 bg-white rounded-sm">
+      <div className="px-5 py-4 border-b border-slate-200">
+        <div className="flex items-baseline gap-3 flex-wrap">
+          <span className="num-tab text-[11px] uppercase tracking-[0.18em] text-slate-500 font-semibold">Figure&nbsp;1</span>
+          <h1 className="serif text-[22px] font-semibold text-slate-900 leading-tight">
+            Within-subjects 2 × 2 SBOM Study — Participant Flow
+          </h1>
+        </div>
+        <p className="text-[13px] text-slate-600 mt-1.5 max-w-3xl leading-relaxed">
+          Recruitment through debrief for the counterbalanced generator&nbsp;×&nbsp;analyzer study.
+          Generators — <b>Syft</b> (CLI) and <b>V-Ops</b> (hosted Spring Boot service);
+          analyzers — <b>BOMbot</b> (LLM chat) and <b>Trustify</b> (dashboard, AWS-hosted).
+          Decision diamonds branch laterally; tool-specific paths run as parallel lanes.
+          Tap any node to reveal its protocol detail.
+        </p>
+        <p className="text-[12px] text-slate-500 mt-2 max-w-3xl leading-relaxed italic">
+          Note: Dependency-Track was evaluated as the second analyzer during pilot but dropped due to inconsistent SPDX JSON ingestion. Trustify was selected because it accepts the Syft-generated SPDX JSON format used throughout this study.
+        </p>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 px-5 py-4">
+        <div>
+          <div className="text-[10.5px] uppercase tracking-[0.16em] text-slate-500 font-semibold mb-2">Phase bands</div>
+          <div className="grid grid-cols-2 gap-2">
+            {Object.values(PHASES).map(p => (
+              <div key={p.id} className="flex items-center gap-2">
+                <span className="inline-block w-3 h-6" style={{ background: p.bg, borderLeft: `3px solid ${p.accent}` }} />
+                <div className="leading-tight">
+                  <div className="num-tab text-[10.5px] tracking-[0.16em] font-semibold uppercase" style={{ color: p.accent }}>Phase {p.num}</div>
+                  <div className="text-[12px] text-slate-700">{p.name.replace(" — ", " · ")}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div className="text-[10.5px] uppercase tracking-[0.16em] text-slate-500 font-semibold mb-2">2 × 2 Counterbalance (Latin square)</div>
+          <table className="w-full text-[12px] border-collapse">
+            <thead>
+              <tr className="text-slate-500">
+                <th className="text-left font-medium pb-1 pr-2">Order</th>
+                <th className="text-left font-medium pb-1 pr-2">Block 1</th>
+                <th className="text-left font-medium pb-1">Block 2</th>
+              </tr>
+            </thead>
+            <tbody className="serif">
+              {[
+                ["1","Syft · BOMbot","V-Ops · Trustify"],
+                ["2","Syft · Trustify","V-Ops · BOMbot"],
+                ["3","V-Ops · BOMbot","Syft · Trustify"],
+                ["4","V-Ops · Trustify","Syft · BOMbot"],
+              ].map(r => (
+                <tr key={r[0]} className="border-t border-slate-200">
+                  <td className="py-1 pr-2 num-tab text-slate-500">{r[0]}</td>
+                  <td className="py-1 pr-2 text-slate-800">{r[1]}</td>
+                  <td className="py-1 text-slate-800">{r[2]}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div className="px-5 py-3 border-t border-slate-200 flex flex-wrap items-center gap-x-5 gap-y-2 text-[11.5px] text-slate-600">
+        <LegendSwatch shape="rect"     label="Process step" />
+        <LegendSwatch shape="diamond"  label="Decision" />
+        <LegendSwatch shape="pill"     label="Terminal" />
+        <LegendSwatch shape="dashed"   label="Exclusion / off-path" />
+        <span className="ml-auto mono text-[10.5px] text-slate-500">[ scr. N ] indicates captured screenshot</span>
+      </div>
+    </div>
+  );
+}
+function LegendSwatch({ shape, label }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      {shape === "rect" && <span className="inline-block w-5 h-3 border border-slate-800 bg-white" />}
+      {shape === "diamond" && (
+        <span className="inline-block w-3.5 h-3.5 border border-slate-800 bg-white" style={{ transform:"rotate(45deg)" }} />
+      )}
+      {shape === "pill" && <span className="inline-block w-6 h-3 rounded-full border border-slate-800 bg-white" />}
+      {shape === "dashed" && <span className="inline-block w-5 h-3 border border-dashed border-slate-500 bg-white" />}
+      <span className="text-slate-700">{label}</span>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Study Design at a Glance — 2x2 matrix                               */
+/* ------------------------------------------------------------------ */
+const MATRIX = [
+  /* row = generator, col = analyzer */
+  { gen:"syft", ana:"bombot", b1:1, b2:4 },
+  { gen:"syft", ana:"trust",  b1:2, b2:3 },
+  { gen:"vops", ana:"bombot", b1:3, b2:2 },
+  { gen:"vops", ana:"trust",  b1:4, b2:1 },
+];
+const GEN_LABEL = { syft:"Syft", vops:"V-Ops" };
+const GEN_SUB   = { syft:"CLI · SPDX", vops:"Hosted · Web" };
+const ANA_LABEL = { bombot:"BOMbot", trust:"Trustify" };
+const ANA_SUB   = { bombot:"LLM chat", trust:"Dashboard · AWS-hosted" };
+const GEN_COLOR = "#1d4ed8";
+const ANA_COLOR = "#6d28d9";
+
+function Matrix({ hover, setHover }) {
+  const cellOf = (g, a) => MATRIX.find(c => c.gen===g && c.ana===a);
+  const isLit = (g, a) => {
+    if (!hover) return false;
+    return (hover.gen === g && hover.ana === a);
+  };
+  return (
+    <div className="border border-slate-300 bg-white rounded-sm shadow-[0_1px_0_0_rgba(15,23,42,0.04),0_10px_30px_-18px_rgba(15,23,42,0.35)]">
+      <div className="px-5 pt-4 pb-3 border-b border-slate-200 flex items-baseline gap-3 flex-wrap">
+        <span className="num-tab text-[11px] uppercase tracking-[0.18em] text-slate-500 font-semibold">Study Design</span>
+        <h2 className="serif text-[18px] font-semibold text-slate-900 leading-tight">at a Glance</h2>
+        <span className="text-[12px] text-slate-600 ml-2">2 × 2 within-subjects · Latin-square counterbalanced</span>
+        <span className="ml-auto text-[11px] mono text-slate-500">hover a cell → highlight path below</span>
+      </div>
+
+      <div className="px-5 py-4">
+        <div className="grid" style={{ gridTemplateColumns: "110px 1fr 1fr", gridTemplateRows: "auto 110px 110px", gap: "8px" }}>
+          {/* top-left blank */}
+          <div></div>
+          {/* column headers: analyzers */}
+          {["bombot","trust"].map(a => (
+            <div key={a} className="flex flex-col items-start justify-end pb-1 pl-1"
+                 onMouseEnter={() => setHover({ gen:null, ana:a })}
+                 onMouseLeave={() => setHover(null)}>
+              <div className="text-[10px] uppercase tracking-[0.16em] font-semibold" style={{ color: ANA_COLOR }}>Analyzer →</div>
+              <div className="serif text-[15px] font-semibold text-slate-900 leading-tight">{ANA_LABEL[a]}</div>
+              <div className="text-[11px] text-slate-500">{ANA_SUB[a]}</div>
+            </div>
+          ))}
+
+          {/* rows */}
+          {["syft","vops"].map(g => (
+            <React.Fragment key={g}>
+              <div className="flex flex-col items-start justify-center pr-2"
+                   onMouseEnter={() => setHover({ gen:g, ana:null })}
+                   onMouseLeave={() => setHover(null)}>
+                <div className="text-[10px] uppercase tracking-[0.16em] font-semibold" style={{ color: GEN_COLOR }}>Generator ↓</div>
+                <div className="serif text-[15px] font-semibold text-slate-900 leading-tight">{GEN_LABEL[g]}</div>
+                <div className="text-[11px] text-slate-500">{GEN_SUB[g]}</div>
+              </div>
+              {["bombot","trust"].map(a => {
+                const c = cellOf(g,a);
+                const lit = isLit(g,a);
+                return (
+                  <div key={a}
+                       className="cell relative p-3 flex flex-col justify-between"
+                       data-active={lit ? "true" : "false"}
+                       style={{ "--hl": GEN_COLOR, "--hl2": ANA_COLOR }}
+                       onMouseEnter={() => setHover({ gen:g, ana:a })}
+                       onMouseLeave={() => setHover(null)}>
+                    <div className="flex items-center justify-between">
+                      <span className="serif text-[13px] font-semibold text-slate-900">
+                        {GEN_LABEL[g]} <span className="text-slate-400 font-normal">×</span> {ANA_LABEL[a]}
+                      </span>
+                      <span className="mono text-[10px] uppercase tracking-[0.12em] text-slate-400">cell {(g==="syft"?0:2) + (a==="bombot"?1:2)}</span>
+                    </div>
+                    <div className="flex items-end gap-2 mt-2">
+                      <OrderChip n={c.b1} role="Block 1" color={GEN_COLOR} />
+                      <span className="text-slate-300">·</span>
+                      <OrderChip n={c.b2} role="Block 2" color={ANA_COLOR} />
+                    </div>
+                    <div className="cell-bar mt-2 opacity-70" />
+                  </div>
+                );
+              })}
+            </React.Fragment>
+          ))}
+        </div>
+
+        <div className="mt-3 flex items-center gap-4 text-[11px] text-slate-600 flex-wrap">
+          <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm" style={{background:GEN_COLOR}}/> Block 1 visit</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm" style={{background:ANA_COLOR}}/> Block 2 visit</span>
+          <span className="text-slate-400">·</span>
+          <span>Each of 4 cells is visited by exactly 2 of the 4 orders — once as Block 1, once as Block 2.</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+function OrderChip({ n, role, color }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="num-tab inline-flex items-center justify-center w-5 h-5 rounded-sm text-[11px] font-semibold text-white"
+            style={{ background: color }}>{n}</span>
+      <span className="text-[10.5px] uppercase tracking-[0.12em] text-slate-500">{role}</span>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Walkthrough script + side panel                                     */
+/* ------------------------------------------------------------------ */
+const ORDERS = {
+  1: { b1:{gen:"syft", ana:"bombot"}, b2:{gen:"vops", ana:"trust"} },
+  2: { b1:{gen:"syft", ana:"trust"},  b2:{gen:"vops", ana:"bombot"} },
+  3: { b1:{gen:"vops", ana:"bombot"}, b2:{gen:"syft", ana:"trust"} },
+  4: { b1:{gen:"vops", ana:"trust"},  b2:{gen:"syft", ana:"bombot"} },
+};
+function genStepsW(gen, blockIdx, anchorOverride) {
+  const a = (id) => anchorOverride || id;
+  const scrBase = blockIdx === 1 ? 0 : 5;
+  if (gen === "syft") return [
+    { anchor:a("syft-1"), title:"Open terminal at ~/study/repo", sees:"Black terminal at the cloned repo.", mins:1, scr:scrBase+1, scrLabel:"syft cli prompt" },
+    { anchor:a("syft-2"), title:"Read task card", sees:"Qualtrics task card: ‘Generate SPDX JSON SBOM with Syft.’", mins:1, qual:"task ack" },
+    { anchor:a("syft-3"), title:"Run syft command", sees:"syft stderr progress, then JSON written to disk.", mins:3 },
+    { anchor:a("syft-4"), title:"Save SBOM to sbom.spdx.json", sees:"File at ~/study/sbom.spdx.json verified via ls.", mins:1, scr:scrBase+2, scrLabel:"output file" },
+  ];
+  return [
+    { anchor:a("vops-1"), title:"Open V-Ops in browser tab", sees:"V-Ops landing — ‘Generate an SBOM’ form.", mins:1 },
+    { anchor:a("vops-2"), title:"Paste Git URL, choose mode", sees:"URL field filled, mode set to publication.", mins:1, qual:"task ack" },
+    { anchor:a("vops-3"), title:"Submit and watch run status", sees:"Run page polling: queued → running → done.", mins:3, scr:scrBase+1, scrLabel:"V-Ops run page" },
+    { anchor:a("vops-4"), title:"Download SBOM artifact", sees:"Artifact list with DOI link beside Download.", mins:1, scr:scrBase+2, scrLabel:"artifact" },
+  ];
+}
+function anaStepsW(ana, blockIdx, anchorOverride) {
+  const a = (id) => anchorOverride || id;
+  const scrBase = blockIdx === 1 ? 2 : 7;
+  if (ana === "bombot") return [
+    { anchor:a("bomb-1"), title:"Open BOMbot in browser tab", sees:"Chat surface ready to receive an SBOM.", mins:1 },
+    { anchor:a("bomb-2"), title:"Drag-and-drop SBOM", sees:"Upload tile with parsed component count.", mins:1, scr:scrBase+1, scrLabel:"upload state" },
+    { anchor:a("bomb-3"), title:"Read instant vuln summary", sees:"Severity cards: 2 critical, 5 high, 11 medium.", mins:2 },
+    { anchor:a("bomb-4"), title:"Ask AI: identify vulnerable dep", sees:"Chat reply naming the dependency + CVE.", mins:2, scr:scrBase+2, scrLabel:"chat answer" },
+    { anchor:a("bomb-5"), title:"Ask AI for mitigation", sees:"Chat suggests upgrade path + patch diff.", mins:3, scr:scrBase+3, scrLabel:"remediation" },
+  ];
+  return [
+    { anchor:a("trust-1"), title:"Open Trustify in browser tab", sees:"Trustify dashboard — Dashboard tab with SBOM/advisory counts.", mins:1 },
+    { anchor:a("trust-2"), title:"Confirm dataset loaded", sees:"6 SBOMs · 66 advisories visible on Dashboard.", mins:2, scr:scrBase+2, scrLabel:"trustify dashboard" },
+    { anchor:a("trust-3"), title:"Open SBOMs section", sees:"List of ingested SBOMs (quarkus-bom, ubi8-container, ubi9-container).", mins:2 },
+    { anchor:a("trust-4"), title:"Drill into one vulnerability", sees:"Vulnerability detail with severity and affected components.", mins:2, scr:scrBase+3, scrLabel:"trustify vuln detail" },
+    { anchor:a("trust-5"), title:"Record finding", sees:"Participant copies package + CVE + suggested fix into Qualtrics.", mins:2 },
+  ];
+}
+function buildScript(order) {
+  const { b1, b2 } = ORDERS[order];
+  const phase1 = [
+    { anchor:"recruit", title:"Recruit via Prolific + UNCC pool", sees:"Prolific study listing page.", mins:0, phase:"I" },
+    { anchor:"eligibility", title:"Eligibility Survey", sees:"Qualtrics: age, role, repo familiarity.", mins:4, qual:"eligibility", phase:"I" },
+    { anchor:"filter", title:"Familiarity Filter", sees:"Real + fabricated SBOM terms.", mins:3, qual:"familiarity", phase:"I" },
+    { anchor:"schedule", title:"Schedule in-person session", sees:"Calendly + SIS consent form email.", mins:0, phase:"I" },
+    { anchor:"consent", title:"In-person consent + audio opt-in", sees:"Consent form, audio recorder armed.", mins:4, audio:true, qual:"consent log", phase:"I" },
+    { anchor:"prestage", title:"Researcher pre-stages workstation", sees:"Researcher activity (participant waits).", mins:2, phase:"I" },
+    { anchor:"counterbalance", title:"Counterbalance assignment", sees:"Researcher reveals order " + order + ".", mins:1, phase:"I" },
+  ];
+  const block1 = [
+    { anchor:"intro-genA", title:"Intro screen — Generator A", sees:"Task card + redirect link.", mins:1, qual:"intro genA", phase:"II" },
+    ...genStepsW(b1.gen, 1).map(s => ({ ...s, phase:"II" })),
+    { anchor:"tlx-genA", title:"NASA-TLX (Generator A) + trust + perceived success", sees:"6 raw TLX items, Likert + open response.", mins:3, qual:"NASA-TLX form", tlx:true, phase:"II" },
+    { anchor:"intro-anaA", title:"Intro screen — Analyzer A", sees:"Task card + redirect link.", mins:1, qual:"intro anaA", phase:"II" },
+    ...anaStepsW(b1.ana, 1).map(s => ({ ...s, phase:"II" })),
+    { anchor:"record-anaA", title:"Record dependency, vuln, mitigation", sees:"Qualtrics form for triple recording.", mins:3, qual:"finding record", phase:"II" },
+    { anchor:"tlx-anaA", title:"NASA-TLX (Analyzer A) + trust + perceived success", sees:"6 raw TLX items, Likert + open response.", mins:3, qual:"NASA-TLX form", tlx:true, phase:"II" },
+  ];
+  const block2 = [
+    { anchor:"washout", title:"3-minute washout", sees:"Neutral video / quiet break.", mins:3, phase:"III" },
+    { anchor:"block2", title:"Intro — Generator B (" + GEN_LABEL[b2.gen] + ")", sees:"Task card + redirect link (new repo).", mins:1, qual:"intro genB", phase:"III" },
+    ...genStepsW(b2.gen, 2, "block2").map(s => ({ ...s, phase:"III" })),
+    { anchor:"block2", title:"NASA-TLX (Generator B) + trust + perceived success", sees:"6 raw TLX items.", mins:3, qual:"NASA-TLX form", tlx:true, phase:"III" },
+    { anchor:"block2", title:"Intro — Analyzer B (" + ANA_LABEL[b2.ana] + ")", sees:"Task card + redirect link.", mins:1, qual:"intro anaB", phase:"III" },
+    ...anaStepsW(b2.ana, 2, "block2").map(s => ({ ...s, phase:"III" })),
+    { anchor:"block2", title:"Record finding (Block 2)", sees:"Qualtrics form for triple recording.", mins:3, qual:"finding record", phase:"III" },
+    { anchor:"block2", title:"NASA-TLX (Analyzer B) + trust + perceived success", sees:"6 raw TLX items.", mins:3, qual:"NASA-TLX form", tlx:true, phase:"III" },
+  ];
+  const phase4 = [
+    { anchor:"comparative", title:"Comparative Feedback Survey", sees:"Forced-choice pair items + open-ended.", mins:5, qual:"comparative", phase:"IV" },
+    { anchor:"debrief", title:"Researcher debrief", sees:"Researcher reveals study aims.", mins:5, audioOff:true, phase:"IV" },
+    { anchor:"compensation", title:"Compensation", sees:"$25 Amazon gift card (digital, on-the-spot).", mins:1, phase:"IV" },
+    { anchor:"end", title:"End of session", sees:"Door, coat, exit.", mins:0, phase:"IV" },
+  ];
+  return [...phase1, ...block1, ...block2, ...phase4];
+}
+function tallyUpTo(script, idx) {
+  let scr = 0, tlx = 0, qual = 0, mins = 0, audio = false;
+  for (let i = 0; i <= idx; i++) {
+    const s = script[i]; if (!s) break;
+    if (s.scr) scr++;
+    if (s.tlx) tlx++;
+    if (s.qual) qual++;
+    mins += s.mins || 0;
+    if (s.audio) audio = true;
+    if (s.audioOff) audio = false;
+  }
+  return { scr, tlx, qual, mins, audio };
+}
+
+function TallyRow({ label, icon:Icon, value, target }) {
+  const pct = target > 0 ? Math.min(100, (value/target)*100) : 0;
+  return (
+    <div className="mb-2">
+      <div className="flex items-center justify-between text-[12px]">
+        <span className="flex items-center gap-1.5 text-slate-700"><Icon className="w-3.5 h-3.5 text-slate-500" /> {label}</span>
+        <span className="num-tab text-slate-900 font-semibold">{value}<span className="text-slate-400 font-normal">/{target}</span></span>
+      </div>
+      <div className="mt-1 h-1 bg-slate-100 rounded-full overflow-hidden">
+        <div className="h-full bg-amber-500" style={{ width: pct + "%" }} />
+      </div>
+    </div>
+  );
+}
+
+function WalkthroughPanel({ order, setOrder, idx, setIdx, script, onClose }) {
+  const step = script[idx] || script[0];
+  const tally = tallyUpTo(script, idx);
+  const minsTotal = script.reduce((a, s) => a + (s.mins || 0), 0);
+  const SCR_TARGET = 10, TLX_TARGET = 4;
+  const QUAL_TARGET = script.filter(s => s.qual).length;
+  const phaseLabel = { I:"Phase I · Setup", II:"Phase II · Block 1", III:"Phase III · Block 2", IV:"Phase IV · Debrief" }[step.phase];
+  const ord = ORDERS[order];
+  return (
+    <aside className="fixed right-5 z-40 w-[360px] flex flex-col border border-slate-300 bg-white rounded-sm shadow-[0_24px_60px_-20px_rgba(15,23,42,0.45)]"
+           style={{ top: "220px", maxHeight: "calc(100vh - 240px)" }}>
+      <header className="px-4 pt-3.5 pb-3 border-b border-slate-200">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 num-tab text-[10.5px] uppercase tracking-[0.18em] text-amber-700 font-semibold">
+            <span className="inline-block w-2 h-2 rounded-full bg-amber-500" /> Walkthrough
+          </span>
+          <span className="ml-auto text-[11px] mono text-slate-500">{idx+1} / {script.length}</span>
+          <button onClick={onClose} aria-label="Close walkthrough" className="text-slate-400 hover:text-slate-800 -mr-1">
+            <I.X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="mt-2 flex items-center gap-1.5">
+          <span className="text-[10.5px] uppercase tracking-[0.14em] text-slate-500">Order</span>
+          {[1,2,3,4].map(o => (
+            <button key={o} onClick={() => { setOrder(o); setIdx(0); }}
+              className={"num-tab text-[12px] w-6 h-6 rounded-sm border transition " + (order===o ? "bg-amber-500 text-white border-amber-600" : "border-slate-300 text-slate-700 bg-white hover:border-slate-500")}>
+              {o}
+            </button>
+          ))}
+          <span className="ml-2 text-[10.5px] text-slate-500 leading-tight">
+            B1: {GEN_LABEL[ord.b1.gen]} × {ANA_LABEL[ord.b1.ana]}<br/>
+            B2: {GEN_LABEL[ord.b2.gen]} × {ANA_LABEL[ord.b2.ana]}
+          </span>
+        </div>
+        <div className="mt-3 h-1 rounded-full bg-slate-100 overflow-hidden">
+          <div className="h-full bg-amber-500 transition-all" style={{ width: ((idx+1)/script.length)*100 + "%" }} />
+        </div>
+        <div className="mt-3 flex items-center gap-2">
+          <button onClick={() => setIdx(Math.max(0, idx-1))} disabled={idx===0}
+            className="flex-1 mono text-[11px] uppercase tracking-[0.12em] px-2 py-1.5 border border-slate-300 rounded-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40">
+            ← Back
+          </button>
+          <button onClick={() => setIdx(Math.min(script.length-1, idx+1))} disabled={idx===script.length-1}
+            className="flex-1 mono text-[11px] uppercase tracking-[0.12em] px-2 py-1.5 border border-amber-600 bg-amber-500 text-white rounded-sm hover:bg-amber-600 disabled:opacity-50">
+            Next →
+          </button>
+        </div>
+      </header>
+
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+        <section>
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-[10.5px] uppercase tracking-[0.14em] text-slate-500 font-semibold">At this step</div>
+            <div className="text-[10px] uppercase tracking-[0.14em] text-amber-700 font-semibold">{phaseLabel}</div>
+          </div>
+          <div className="serif text-[15px] font-semibold text-slate-900 leading-snug">{step.title}</div>
+          <div className="text-[12.5px] text-slate-600 mt-1 leading-relaxed">
+            <span className="text-slate-400">Participant sees —</span> {step.sees}
+          </div>
+        </section>
+
+        <section>
+          <div className="text-[10.5px] uppercase tracking-[0.14em] text-slate-500 font-semibold mb-1">Data captured here</div>
+          <ul className="space-y-1 text-[12.5px]">
+            {step.scr && <li className="flex items-center gap-2"><I.Camera className="w-3.5 h-3.5 text-slate-500" /> Screenshot <span className="num-tab font-semibold">{step.scr}</span><span className="text-slate-400">— {step.scrLabel}</span></li>}
+            {step.tlx && <li className="flex items-center gap-2"><I.Gauge className="w-3.5 h-3.5 text-slate-500" /> NASA-TLX administration</li>}
+            {step.qual && <li className="flex items-center gap-2"><I.ClipboardList className="w-3.5 h-3.5 text-slate-500" /> Qualtrics: {step.qual}</li>}
+            {step.audio && <li className="flex items-center gap-2"><I.Mic className="w-3.5 h-3.5 text-rose-600" /> Audio recording starts</li>}
+            {step.audioOff && <li className="flex items-center gap-2"><I.Mic className="w-3.5 h-3.5 text-slate-400" /> Audio recording stops</li>}
+            {!step.scr && !step.tlx && !step.qual && !step.audio && !step.audioOff && (
+              <li className="text-slate-400 italic">— no capture at this step —</li>
+            )}
+          </ul>
+        </section>
+
+        <section>
+          <div className="text-[10.5px] uppercase tracking-[0.14em] text-slate-500 font-semibold mb-1">Elapsed (approx.)</div>
+          <div className="serif text-[18px] font-semibold text-slate-900 num-tab leading-none">
+            ≈ {tally.mins}<span className="text-[12px] text-slate-500 font-normal ml-1">min</span>
+            <span className="text-slate-400 font-normal text-[13px] ml-2">/ {minsTotal} min total</span>
+          </div>
+        </section>
+
+        <section className="border-t border-slate-200 pt-3">
+          <div className="text-[10.5px] uppercase tracking-[0.14em] text-slate-500 font-semibold mb-2">Data collected so far</div>
+          <TallyRow label="Screenshots" icon={I.Camera} value={tally.scr} target={SCR_TARGET} />
+          <TallyRow label="NASA-TLX administrations" icon={I.Gauge} value={tally.tlx} target={TLX_TARGET} />
+          <TallyRow label="Qualtrics survey events" icon={I.ClipboardList} value={tally.qual} target={QUAL_TARGET} />
+          <div className="flex items-center justify-between mt-2 text-[12px]">
+            <span className="flex items-center gap-1.5 text-slate-700">
+              <I.Mic className={"w-3.5 h-3.5 " + (tally.audio ? "text-rose-600" : "text-slate-400")} />
+              Audio recording
+            </span>
+            <span className={"mono text-[11px] uppercase tracking-[0.14em] " + (tally.audio ? "text-rose-600" : "text-slate-400")}>
+              {tally.audio ? "● ON" : "○ OFF"}
+            </span>
+          </div>
+        </section>
+      </div>
+    </aside>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Main flow                                                           */
+/* ------------------------------------------------------------------ */
+function StudyFlow() {
+  const [open, setOpen] = useState(() => new Set());
+  const toggle = useCallback((id) => {
+    setOpen(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }, []);
+  const isOpen = (id) => open.has(id);
+
+  const [expandAll, setExpandAll] = useState(false);
+  const allIds = useMemo(() => Array.from(document.querySelectorAll("[data-nid]")).map(n=>n.dataset.nid), [expandAll]);
+
+  /* Helper that wires id → toggle */
+  const N = (props) => (
+    <div data-nid={props.id} className={activeNid===props.id ? "walk-active" : ""}>
+      <Node {...props} expanded={isOpen(props.id)} onToggle={toggle} />
+      {activeNid===props.id && <span className="walk-avatar" aria-hidden="true">P</span>}
+    </div>
+  );
+
+  const [hover, setHover] = useState(null); // {gen, ana} | null
+  const rootAttrs = {};
+  if (hover?.gen) rootAttrs["data-gh"] = hover.gen;
+  if (hover?.ana) rootAttrs["data-ah"] = hover.ana;
+
+  // Walkthrough state
+  const [walkOn, setWalkOn] = useState(false);
+  const [order, setOrder] = useState(1);
+  const [stepIdx, setStepIdx] = useState(0);
+  const script = useMemo(() => buildScript(order), [order]);
+  const activeNid = walkOn ? (script[stepIdx]?.anchor) : null;
+
+  useEffect(() => {
+    if (!walkOn) return;
+    const onKey = (e) => {
+      if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+      if (e.key === "ArrowRight") { e.preventDefault(); setStepIdx(i => Math.min(script.length-1, i+1)); }
+      if (e.key === "ArrowLeft")  { e.preventDefault(); setStepIdx(i => Math.max(0, i-1)); }
+      if (e.key === "Escape") setWalkOn(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [walkOn, script.length]);
+
+  useEffect(() => {
+    if (!walkOn || !activeNid) return;
+    const el = document.querySelector('[data-nid="' + activeNid + '"]');
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const targetY = window.scrollY + r.top - 260;
+    window.scrollTo({ top: targetY, behavior: "smooth" });
+  }, [activeNid, walkOn]);
+
+  return (
+    <div className="stage-root max-w-[1100px] mx-auto px-6 pb-10">
+      <div className="sticky top-0 z-30 pt-4 pb-3 -mx-6 px-6 no-print"
+           style={{ background: "linear-gradient(to bottom, rgba(251,251,249,1) 0%, rgba(251,251,249,1) 88%, rgba(251,251,249,0) 100%)" }}>
+        <Matrix hover={hover} setHover={setHover} />
+        <div className="mt-2 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setWalkOn(v => !v)}
+            aria-pressed={walkOn}
+            className={"mono text-[11px] uppercase tracking-[0.14em] px-3 py-1.5 rounded-sm border transition flex items-center gap-1.5 " + (walkOn ? "bg-amber-500 text-white border-amber-600" : "bg-white text-slate-800 border-slate-300 hover:border-slate-700")}>
+            <span className={"inline-block w-2 h-2 rounded-full " + (walkOn ? "bg-white" : "bg-amber-500")} />
+            {walkOn ? "Stop Walkthrough" : "Walkthrough Mode"}
+          </button>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="mono text-[11px] uppercase tracking-[0.14em] px-3 py-1.5 rounded-sm border bg-white text-slate-800 border-slate-300 hover:border-slate-700 transition flex items-center gap-1.5"
+            title="Open print dialog — expands every node and paginates by phase"
+          >
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+            Print / Export PDF
+          </button>
+          {walkOn && (
+            <span className="text-[11px] text-slate-600">
+              <span className="mono text-slate-400">← / →</span> step · <span className="mono text-slate-400">Esc</span> exit · panel on the right
+            </span>
+          )}
+        </div>
+      </div>
+
+      {walkOn && (
+        <WalkthroughPanel order={order} setOrder={setOrder} idx={stepIdx} setIdx={setStepIdx} script={script} onClose={() => setWalkOn(false)} />
+      )}
+
+      <div className="flow-root" {...rootAttrs}>
+      <Legend />
+
+      {/* ============================ Tools at a glance ============================ */}
+      <section className="border border-slate-300 bg-white rounded-sm my-6">
+        <header className="px-5 py-3 border-b border-slate-200">
+          <div className="num-tab text-[10.5px] uppercase tracking-[0.16em] text-slate-500 font-semibold">Reference</div>
+          <div className="serif text-[16px] font-semibold text-slate-900">Tools at a glance</div>
+        </header>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-4 p-5 text-[12.5px]">
+
+          {/* Syft */}
+          <div className="border border-slate-200 rounded-sm p-3 space-y-1.5">
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="serif text-[15px] font-semibold text-slate-900">Syft</span>
+              <span className="mono text-[10px] uppercase tracking-[0.12em] font-semibold" style={{ color: GEN_COLOR }}>SBOM Generator</span>
+              <span className="text-[10.5px] text-slate-500">Block 1 or 2 per Latin-square order</span>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap text-[11.5px]">
+              <span className="text-slate-500">Access:</span>
+              <span className="mono text-[11px] bg-slate-100 border border-slate-200 text-slate-700 px-1.5 py-0.5 rounded-sm">CLI · local terminal</span>
+            </div>
+            <div className="text-slate-700 leading-snug">Participant runs <span className="mono text-[11px]">syft scan dir:. -o spdx-json=sbom.spdx.json</span> in <span className="mono">~/study/repo</span> to produce an <Acr code="SPDX" /> JSON <Acr code="SBOM" />.</div>
+            <div className="text-[11px] text-slate-500 italic">Anchore Syft — open-source CLI.</div>
+          </div>
+
+          {/* V-Ops */}
+          <div className="border border-slate-200 rounded-sm p-3 space-y-1.5">
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="serif text-[15px] font-semibold text-slate-900">V-Ops</span>
+              <span className="mono text-[10px] uppercase tracking-[0.12em] font-semibold" style={{ color: GEN_COLOR }}>SBOM Generator</span>
+              <span className="text-[10.5px] text-slate-500">Block 1 or 2 per Latin-square order</span>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap text-[11.5px]">
+              <span className="text-slate-500">Access:</span>
+              <ToolLink href={TOOL_URLS.vops}>sb-3f097ade….ecs.us-east-1.on.aws</ToolLink>
+              <span className="text-slate-400">·</span>
+              <span className="mono text-[10.5px] text-slate-500">POST /api/sbom</span>
+            </div>
+            <div className="text-slate-700 leading-snug">Participant pastes a public Git URL into the web form, submits, and downloads the SBOM artifact + Zenodo <Acr code="DOI" /> link.</div>
+            <div className="text-[11px] text-slate-500 italic">Spring Boot — Public SBOM and Publication Record Service.</div>
+          </div>
+
+          {/* BOMbot */}
+          <div className="border border-slate-200 rounded-sm p-3 space-y-1.5">
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="serif text-[15px] font-semibold text-slate-900">BOMbot</span>
+              <span className="mono text-[10px] uppercase tracking-[0.12em] font-semibold" style={{ color: ANA_COLOR }}>SBOM Analyzer</span>
+              <span className="text-[10.5px] text-slate-500">Block 1 or 2 per Latin-square order</span>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap text-[11.5px]">
+              <span className="text-slate-500">Access:</span>
+              <ToolLink href={TOOL_URLS.bombot}>bombot.vercel.app</ToolLink>
+            </div>
+            <div className="text-slate-700 leading-snug">Participant drags the SBOM into the chat, asks <em>"which vulnerability should I fix first?"</em>, and reads the LLM reply with OSV.dev evidence links.</div>
+            <div className="text-[11px] text-slate-500 italic">OpenAI assistant + OSV.dev — Vercel-hosted.</div>
+          </div>
+
+          {/* Trustify */}
+          <div className="border border-slate-200 rounded-sm p-3 space-y-1.5">
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="serif text-[15px] font-semibold text-slate-900">Trustify</span>
+              <span className="mono text-[10px] uppercase tracking-[0.12em] font-semibold" style={{ color: ANA_COLOR }}>SBOM Analyzer</span>
+              <span className="text-[10.5px] text-slate-500">Block 1 or 2 per Latin-square order</span>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap text-[11.5px]">
+              <span className="text-slate-500">Access:</span>
+              <ToolLink href={TOOL_URLS.trustify}>d3nclnp83x4i9u.cloudfront.net</ToolLink>
+            </div>
+            <div className="text-slate-700 leading-snug">Participant browses the dashboard (<b>6 SBOMs</b> · <b>66 advisories</b>), picks the assigned SBOM, and drills into Vulnerabilities to inspect a <Acr code="CVE" />.</div>
+            <div className="text-[11px] text-slate-500 italic">AWS ECS Fargate + RDS + S3 via CloudFront.</div>
+          </div>
+
+        </div>
+      </section>
+
+      <div className="flex items-center gap-3 my-5 no-print">
+        <button
+          type="button"
+          onClick={() => {
+            if (open.size > 0) setOpen(new Set());
+            else setOpen(new Set([
+              "recruit","eligibility","filter","schedule","consent","prestage","counterbalance",
+              "intro-genA","syft-1","syft-2","syft-3","syft-4",
+              "vops-1","vops-2","vops-3","vops-4",
+              "tlx-genA","intro-anaA","bomb-1","bomb-2","bomb-3","bomb-4","trust-1","trust-2","trust-3","trust-4","trust-5",
+              "record-anaA","tlx-anaA","washout","block2",
+              "comparative","debrief","compensation","end"
+            ]));
+          }}
+          className="text-[11.5px] mono uppercase tracking-[0.14em] text-slate-700 border border-slate-300 px-3 py-1.5 rounded-sm hover:bg-white"
+        >
+          {open.size > 0 ? "Collapse all" : "Expand all"}
+        </button>
+        <span className="text-[11.5px] text-slate-500">Click any node to reveal protocol detail.</span>
+      </div>
+
+      {/* ============================ PHASE I ============================ */}
+      <PhaseBand phase={PHASES.P1}>
+        <VStack gap={16}>
+          {/* recruit */}
+          <N id="recruit" icon={I.Users} title="Recruit via Prolific + UNCC pool"
+             sub="N ≈ 32 SWE/DevOps practitioners; stratified by repo-management experience."
+             instrument="recruitment"
+             detail={
+               <ul className="list-disc pl-4 space-y-1">
+                 <li>Prolific: paid SWE pre-screen audience.</li>
+                 <li>UNCC pool: snowball recruitment from CS graduate cohort.</li>
+                 <li>Stop rule: when each Latin-square cell has ≥&nbsp;8 completers.</li>
+               </ul>
+             } />
+
+          <N id="eligibility" icon={I.ClipboardList} title="Qualtrics: Eligibility Survey"
+             sub={<><QualtricsPlaceholder slot="PRESCREENING" /> &nbsp;·&nbsp; age, role, repo familiarity, prior <Acr code="SBOM" /> exposure</>}
+             instrument="qualtrics"
+             detail={
+               <div className="space-y-2 text-[12.5px]">
+                 <div className="flex items-center gap-2 flex-wrap">
+                   <span className="serif font-semibold text-slate-900">Eligibility Survey — Qualtrics:</span>
+                   <QualtricsPlaceholder slot="PRESCREENING" />
+                 </div>
+                 <div className="text-slate-600 italic leading-snug">“This short survey helps determine if you are eligible for the study. Your responses will be used only for screening purposes.”</div>
+                 <ol className="list-decimal pl-5 space-y-2 bg-slate-50 border border-slate-200 rounded-sm p-3">
+                   <li>
+                     <div className="font-semibold text-slate-900">Are you 18 years of age or older?</div>
+                     <ul className="list-disc pl-5 text-slate-700 space-y-0.5">
+                       <li>Yes</li>
+                       <li>No <span className="text-rose-700 font-semibold">→ end survey</span></li>
+                     </ul>
+                   </li>
+                   <li>
+                     <div className="font-semibold text-slate-900">What is your current role?</div>
+                     <ul className="list-disc pl-5 text-slate-700 space-y-0.5">
+                       <li>Undergraduate student</li>
+                       <li>Graduate student</li>
+                       <li>Software developer / engineer</li>
+                       <li>Security engineer / analyst</li>
+                       <li>Researcher</li>
+                       <li>Other (please specify)</li>
+                     </ul>
+                   </li>
+                   <li>
+                     <div className="font-semibold text-slate-900">How many years of experience do you have working with software development tools?</div>
+                     <ul className="list-disc pl-5 text-slate-700 space-y-0.5">
+                       <li>Less than 1 year</li><li>1–2 years</li><li>3–5 years</li><li>5+ years</li>
+                     </ul>
+                   </li>
+                   <li>
+                     <div className="font-semibold text-slate-900">How often do you use platforms or tools for working with code repositories (e.g., GitHub)?</div>
+                     <ul className="list-disc pl-5 text-slate-700 space-y-0.5">
+                       <li>Daily</li><li>Weekly</li><li>Monthly</li><li>Rarely</li>
+                       <li>Never <span className="text-rose-700 font-semibold">→ exclude</span></li>
+                     </ul>
+                   </li>
+                   <li>
+                     <div className="font-semibold text-slate-900">Which of the following are you familiar with? <span className="text-slate-500 font-normal">(Select all that apply)</span></div>
+                     <ul className="list-disc pl-5 text-slate-700 space-y-0.5">
+                       <li>Code repositories</li>
+                       <li>Software dependencies / libraries</li>
+                       <li>Package managers (e.g., npm, pip, Maven, Go modules)</li>
+                       <li>Build systems (e.g., CMake, Gradle, PlatformIO)</li>
+                       <li>Vulnerability scanners</li>
+                       <li>None of the above <span className="text-rose-700 font-semibold">→ exclude</span></li>
+                     </ul>
+                   </li>
+                   <li>
+                     <div className="font-semibold text-slate-900">Please rate your familiarity with each of the following terms. <span className="text-slate-500 font-normal">(Scale: Not familiar / Heard of it / Have used it / Use it regularly)</span></div>
+                     <ul className="list-disc pl-5 text-slate-700 space-y-0.5">
+                       <li><Acr code="SBOM" /> (Software Bill of Materials)</li>
+                       <li><Acr code="SPDX" /></li>
+                       <li><Acr code="CycloneDX" /></li>
+                       <li>Syft</li>
+                       <li><Acr code="DOI" /></li>
+                     </ul>
+                   </li>
+                   <li>
+                     <div className="font-semibold text-slate-900">Have you ever generated or analyzed an <Acr code="SBOM" /> in your own work?</div>
+                     <ul className="list-disc pl-5 text-slate-700 space-y-0.5">
+                       <li>Yes, regularly</li><li>Yes, once or twice</li><li>No</li>
+                     </ul>
+                   </li>
+                   <li>
+                     <div className="font-semibold text-slate-900">Are you comfortable completing a short computer-based task?</div>
+                     <ul className="list-disc pl-5 text-slate-700 space-y-0.5">
+                       <li>Yes</li>
+                       <li>No <span className="text-rose-700 font-semibold">→ exclude</span></li>
+                     </ul>
+                   </li>
+                   <li>
+                     <div className="font-semibold text-slate-900">Please provide your email if you are interested in participating: <span className="mono text-[10.5px] uppercase tracking-[0.12em] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded-sm ml-1">Optional</span></div>
+                     <ul className="list-disc pl-5 text-slate-700 space-y-0.5">
+                       <li><span className="mono">[Text Entry]</span></li>
+                     </ul>
+                   </li>
+                   <li>
+                     <div className="font-semibold text-slate-900">How comfortable are you reading software artifacts such as JSON or XML files?</div>
+                     <ul className="list-disc pl-5 text-slate-700 space-y-0.5">
+                       <li>Not comfortable</li><li>Slightly comfortable</li><li>Moderately comfortable</li><li>Very comfortable</li>
+                     </ul>
+                   </li>
+                 </ol>
+                 <div className="text-[11.5px] text-slate-600">Routing logic enforces single submission per Prolific ID. Exclusion options highlighted in <span className="text-rose-700 font-semibold">red</span>.</div>
+               </div>
+             } />
+
+          {/* eligible? branch */}
+          <div className="flex flex-col items-center">
+            <Diamond label="Eligible?" leftLabel="Yes" rightLabel="No  →  Exclude" rightTone="danger" />
+          </div>
+
+          {/* both branches: left continues, right ends at Exclude */}
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <N id="filter" icon={I.Filter} title="Qualtrics: Familiarity Filter"
+                 sub={<><QualtricsPlaceholder slot="PRESCREENING" /> &nbsp;·&nbsp; real + fabricated <Acr code="SBOM" /> terminology (lure items)</>}
+                 instrument="qualtrics"
+                 detail={
+                   <div>4 real terms (SPDX, CycloneDX, purl, NVD) and 3 fabricated lures.
+                   Pass threshold: ≥3 real correctly identified, 0 fabricated endorsed.</div>
+                 } />
+            </div>
+            <div className="flex items-start justify-center pt-1">
+              <N id="exclude" icon={I.X} title="Exclude" dashed dim
+                 sub="thank-you screen + Prolific completion code for screen-out"
+                 detail={<>Compensated at screen-out rate per Prolific policy; not counted toward N.</>} />
+            </div>
+          </div>
+
+          {/* Pass filter? */}
+          <div className="flex flex-col items-center">
+            <Diamond label="Pass filter?" leftLabel="Pass" rightLabel="Fail  →  Exclude" rightTone="danger" />
+          </div>
+
+          <N id="schedule" icon={I.CalendarCheck} title="Schedule in-person session"
+             sub={<>Calendly slot + <Acr code="SIS" /> consent form sent ≥ 24h prior</>}
+             instrument="scheduling"
+             detail={
+               <div className="space-y-1">
+                 <div>SIS = Study Information Sheet (IRB #XXX-XXXX).</div>
+                 <div>Reminders: T-24h email, T-1h SMS.</div>
+                 <div>Session window: 60 min, lab room with one researcher present.</div>
+               </div>
+             } />
+
+          <N id="consent" icon={I.Mic} title="In-person consent + audio recording opt-in"
+             sub="Participant ID assigned (P##); recording on local SD only"
+             instrument="consent"
+             detail={
+               <div>Two-part consent: (a) participation, (b) audio capture for think-aloud.
+               Refusal of (b) is permitted; participant remains enrolled and is annotated <span className="mono">no-audio</span>.</div>
+             } />
+
+          <N id="prestage" icon={I.Server} title="Researcher pre-stages workstation"
+             sub="Tools ready: Syft CLI on PATH · V-Ops Spring Boot service on AWS (ECS) · Trustify URL pre-loaded · BOMbot URL pre-loaded · Qualtrics surveys staged"
+             instrument="setup"
+             detail={
+               <div className="space-y-1">
+                 <div className="mono text-[11.5px] text-slate-700 bg-slate-50 border border-slate-200 rounded-sm px-2 py-1.5">
+                   ~/study/repo &nbsp;·&nbsp; sb-3f097ade….ecs.us-east-1.on.aws (V-Ops) &nbsp;·&nbsp; bombot.vercel.app &nbsp;·&nbsp; d3nclnp83x4i9u.cloudfront.net (Trustify)
+                 </div>
+                 <div>Browser is reset between participants (fresh profile); clipboard cleared.</div>
+               </div>
+             } />
+
+          <N id="counterbalance" icon={I.Grid2x2} title="Counterbalance assignment"
+             sub="2 × 2 within-subjects, Latin-square order (generator × analyzer)"
+             instrument="assignment"
+             detail={
+               <div>
+                 Researcher reads next-row from the pre-randomized assignment sheet (sealed envelope per P##).
+                 Order is the only between-participant variable.
+               </div>
+             } />
+        </VStack>
+      </PhaseBand>
+
+      <Connector h={22} />
+
+      {/* ============================ PHASE II ============================ */}
+      <PhaseBand phase={PHASES.P2}>
+        <VStack gap={14}>
+          <N id="intro-genA" icon={I.FileText} title="Qualtrics intro screen for Generator A"
+             sub={<><QualtricsPlaceholder slot="INTRO_GENA" /> &nbsp;·&nbsp; task card + redirect link to assigned tool</>}
+             instrument="qualtrics"
+             tone="blue"
+             detail={<>Single-page task card. Includes scenario framing (“you are evaluating SBOM tooling for your team”), success criteria, and a one-click redirect.</>} />
+
+          <div className="flex flex-col items-center">
+            <Diamond label="Generator A?" leftLabel="Syft" rightLabel="V-Ops" />
+          </div>
+
+          {/* parallel generator lanes */}
+          <TwoLanes
+            accent={PHASES.P2.accent}
+            axis="gen"
+            leftLane="syft"
+            rightLane="vops"
+            leftHeader="Lane A · Syft (CLI)"
+            rightHeader="Lane B · V-Ops (Web)"
+            left={
+              <VStack gap={10}>
+                <N id="syft-1" icon={I.Terminal} tone="blue"
+                   title="Open terminal at ~/study/repo"
+                   sub="CLI tool — no URL. Researcher confirms syft is on PATH."
+                   screenshot="scr. 1 — syft cli prompt"
+                   detail={
+                     <div className="text-[12.5px] text-slate-700 leading-relaxed space-y-1.5">
+                       <div className="font-semibold text-slate-900">Participant navigation — Syft (CLI)</div>
+                       <ol className="list-decimal pl-5 space-y-0.5">
+                         <li><span className="mono">cd ~/study/repo</span></li>
+                         <li><span className="mono">syft scan dir:. -o spdx-json=sbom.spdx.json</span></li>
+                         <li>Confirm <span className="mono">sbom.spdx.json</span> is created in the repo root.</li>
+                         <li>Verify the file opens and contains <span className="mono">spdxVersion</span>, <span className="mono">SPDXID</span>, <span className="mono">documentNamespace</span>.</li>
+                         <li className="text-slate-500 italic">(V-Ops backend uses the same <span className="mono">SbomValidator</span> for its generator path — see SpringbootAPP.txt.)</li>
+                       </ol>
+                       <div className="text-slate-500 italic">Source: Syft docs + SpringbootAPP.txt.</div>
+                     </div>
+                   } />
+                <N id="syft-2" icon={I.FileText} tone="blue"
+                   title="Read task card"
+                   sub={<>“Generate <Acr code="SPDX" /> JSON <Acr code="SBOM" /> with Syft”</>} />
+                <N id="syft-3" icon={I.Play} tone="blue"
+                   title="Run syft command"
+                   sub="self-discovered or provided per protocol"
+                   detail={
+                     <div className="space-y-1">
+                       <div>Protocol branch P-Discover: participant must locate the command via docs.</div>
+                       <div>Protocol branch P-Provide: command is printed on the task card.</div>
+                       <div className="mono text-[11.5px] bg-slate-50 border border-slate-200 rounded-sm px-2 py-1">
+                         syft ~/study/repo -o spdx-json &gt; ~/study/sbom.spdx.json
+                       </div>
+                     </div>
+                   } />
+                <N id="syft-4" icon={I.Save} tone="blue"
+                   title={<>Save <Acr code="SBOM" /> to ~/study/sbom.spdx.json</>}
+                   screenshot="scr. 2 — output file" />
+              </VStack>
+            }
+            right={
+              <VStack gap={10}>
+                <N id="vops-1" icon={I.Globe} tone="blue"
+                   title="Open V-Ops in browser tab"
+                   sub={<>URL: <ToolLink href={TOOL_URLS.vops}>sb-3f097ade….ecs.us-east-1.on.aws</ToolLink> &nbsp;·&nbsp; endpoint <span className="mono text-slate-500">POST /api/sbom</span></>}
+                   detail={
+                     <div className="text-[12.5px] text-slate-700 leading-relaxed space-y-1.5">
+                       <div className="font-semibold text-slate-900">Participant navigation — V-Ops (Web)</div>
+                       <ol className="list-decimal pl-5 space-y-0.5">
+                         <li>Open <ToolLink href={TOOL_URLS.vops}>V-Ops on AWS</ToolLink> in a fresh browser tab.</li>
+                         <li>Paste the assigned public HTTPS Git URL into the form.</li>
+                         <li>Select publication mode: <span className="mono">FULL_SBOM_PUBLIC</span> (study default).</li>
+                         <li>Submit. Watch the run page: <span className="mono">queued → cloning → generating → publishing</span>.</li>
+                         <li>When done, the page shows: SPDX JSON SBOM, SWID tag, combined artifact, and Zenodo DOI link.</li>
+                         <li>Save the artifact filename for the analyzer step.</li>
+                       </ol>
+                       <div className="text-slate-500 italic">Source: SpringbootAPP.txt — <span className="mono">POST /api/sbom</span> flow.</div>
+                     </div>
+                   } />
+                <N id="vops-2" icon={I.Upload} tone="blue"
+                   title="Paste public Git URL of assigned repo"
+                   sub="select publication mode" />
+                <N id="vops-3" icon={I.Play} tone="blue"
+                   title="Submit and watch run status"
+                   screenshot="scr. 1 — V-Ops run page" />
+                <N id="vops-4" icon={I.Download} tone="blue"
+                   title={<>Download <Acr code="SBOM" /> artifact</>}
+                   sub={<>or copy <Acr code="DOI" /> link</>}
+                   screenshot="scr. 2 — artifact" />
+              </VStack>
+            }
+          />
+
+          <MergeIn accent={PHASES.P2.accent} />
+
+          <N id="tlx-genA" icon={I.Gauge} tone="blue"
+             title="Return to Qualtrics — Generator A measures"
+             sub={<><QualtricsPlaceholder slot="TLX_GENA" /> &nbsp;·&nbsp; <Acr code="NASA-TLX" /> (raw, 6 items) + trust + perceived success</>}
+             instrument="qualtrics"
+             detail={<TlxBattery scope="Generator A" slot="TLX_GENA" />} />
+
+          {/* Analyzer */}
+          <N id="intro-anaA" icon={I.FileText} tone="blue"
+             title="Qualtrics intro screen for Analyzer A"
+             sub={<><QualtricsPlaceholder slot="INTRO_ANAA" /> &nbsp;·&nbsp; task card + redirect link</>} />
+
+          <div className="flex flex-col items-center">
+            <Diamond label="Analyzer A?" leftLabel="BOMbot" rightLabel="Trustify" />
+          </div>
+
+          <TwoLanes
+            accent={PHASES.P2.accent}
+            axis="ana"
+            leftLane="bombot"
+            rightLane="trust"
+            leftHeader="Lane A · BOMbot (Chat)"
+            rightHeader="Lane B · Trustify (Dashboard)"
+            left={
+              <VStack gap={10}>
+                <N id="bomb-1" icon={I.Globe} tone="blue"
+                   title="Open BOMbot in browser tab"
+                   sub={<>URL: <ToolLink href={TOOL_URLS.bombot} /></>}
+                   detail={
+                     <div className="text-[12.5px] text-slate-700 leading-relaxed space-y-1.5">
+                       <div className="font-semibold text-slate-900">Participant navigation — BOMbot</div>
+                       <ol className="list-decimal pl-5 space-y-0.5">
+                         <li>Open <ToolLink href={TOOL_URLS.bombot}>bombot.vercel.app</ToolLink> in a fresh browser tab.</li>
+                         <li>Confirm the chat interface and upload area are visible. No login required.</li>
+                         <li>Drag-and-drop the researcher-provided SPDX JSON SBOM, or use the file picker.</li>
+                         <li>Wait for the instant vulnerability summary (severity-coded cards).</li>
+                         <li>Use chat to ask: <em>“Which vulnerability should I fix first?”</em></li>
+                         <li>Open the OSV.dev evidence link for the vulnerability you select.</li>
+                       </ol>
+                       <div className="text-slate-500 italic">Source: BOMbot Navigation Report §3, §9.</div>
+                     </div>
+                   } />
+                <N id="bomb-2" icon={I.Upload} tone="blue"
+                   title={<>Drag-and-drop <Acr code="SBOM" /></>}
+                   screenshot="scr. 3 — upload state" />
+                <N id="bomb-3" icon={I.Bug} tone="blue"
+                   title="Read instant vulnerability summary"
+                   sub="severity-coded cards" />
+                <N id="bomb-4" icon={I.MessageCircle} tone="blue"
+                   title="Ask AI follow-up"
+                   sub="identify a vulnerable dependency"
+                   screenshot="scr. 4 — chat answer" />
+                <N id="bomb-5" icon={I.Wrench} tone="blue"
+                   title="Ask AI for mitigation"
+                   screenshot="scr. 5 — remediation" />
+              </VStack>
+            }
+            right={
+              <VStack gap={10}>
+                <N id="trust-1" icon={I.ShieldCheck} tone="blue"
+                   title="Open Trustify dashboard in browser tab"
+                   sub={<>URL: <ToolLink href={TOOL_URLS.trustify} /> &nbsp;·&nbsp; CloudFront HTTPS — no login required</>}
+                   detail={
+                     <div className="text-[12.5px] text-slate-700 leading-relaxed space-y-1.5">
+                       <div className="font-semibold text-slate-900">Participant navigation — Trustify (Dashboard)</div>
+                       <ol className="list-decimal pl-5 space-y-0.5">
+                         <li>Open <ToolLink href={TOOL_URLS.trustify}>d3nclnp83x4i9u.cloudfront.net</ToolLink> (HTTPS via CloudFront).</li>
+                         <li>Confirm the Dashboard loads with <b>6 SBOMs</b> and <b>66 advisories</b>.</li>
+                         <li>Note the vulnerability severity bars — larger bars = more vulnerabilities.</li>
+                         <li>Click “SBOMs” in the left nav, then pick the assigned SBOM (e.g. <span className="mono">quarkus-bom</span>).</li>
+                         <li>Open “Vulnerabilities” to inspect correlated CVEs.</li>
+                         <li>Open “Packages” to inspect components contributing to matches.</li>
+                         <li className="text-slate-500">The “Unable to connect” warning in a lower panel can be ignored — main data loads.</li>
+                       </ol>
+                       <div className="text-slate-500 italic">
+                         Fallback origin: <ToolLink href={TOOL_URLS.trustify_fallback}>ALB</ToolLink> (HTTP, only if CloudFront is unreachable).
+                       </div>
+                       <div className="text-slate-500 italic">Source: Trustify User Access and Navigation Report §5, §6, §9.</div>
+                     </div>
+                   } />
+                <N id="trust-2" icon={I.ListChecks} tone="blue"
+                   title="Confirm SBOMs and Advisories loaded on the Dashboard"
+                   sub="6 SBOMs · 66 advisories · severity bars visible"
+                   screenshot="scr. 3 — trustify dashboard" />
+                <N id="trust-3" icon={I.FolderPlus} tone="blue"
+                   title="Open the SBOMs section, pick the assigned SBOM"
+                   sub="e.g. quarkus-bom (largest vulnerability bar)"
+                   screenshot="scr. 4 — trustify sbom list" />
+                <N id="trust-4" icon={I.Search} tone="blue"
+                   title="Open Vulnerabilities and drill into one CVE"
+                   sub="read description, affected components, severity"
+                   screenshot="scr. 5 — trustify vuln detail" />
+                <N id="trust-5" icon={I.BookOpen} tone="blue"
+                   title="Record the package, vulnerability ID, and suggested fix"
+                   sub="cross-check with the Packages and Advisories tabs" />
+              </VStack>
+            }
+          />
+
+          <MergeIn accent={PHASES.P2.accent} />
+
+          <N id="record-anaA" icon={I.ClipboardList} tone="blue"
+             title="Return to Qualtrics — record findings"
+             sub={<><QualtricsPlaceholder slot="INTRO_ANAA" /> &nbsp;·&nbsp; dependency, vulnerability, mitigation chosen</>}
+             instrument="qualtrics" />
+
+          <N id="tlx-anaA" icon={I.Gauge} tone="blue"
+             title={<>Qualtrics: <Acr code="NASA-TLX" /> (raw, 6 items) + trust + perceived success</>}
+             sub={<QualtricsPlaceholder slot="TLX_ANAA" />}
+             instrument="qualtrics"
+             detail={<TlxBattery scope="Analyzer A" slot="TLX_ANAA" />} />
+        </VStack>
+      </PhaseBand>
+
+      <Connector h={22} />
+
+      {/* ============================ PHASE III ============================ */}
+      <PhaseBand phase={PHASES.P3}>
+        <VStack gap={16}>
+          <N id="washout" icon={I.Pause} tone="indigo"
+             title="3-minute washout"
+             sub="neutral video / break"
+             detail={<>Neutral non-tech short (lab playlist). Researcher minimises conversation to reduce carryover priming.</>} />
+
+          <div className="rounded-sm border border-indigo-900/40 bg-white">
+            <button
+              type="button"
+              onClick={() => toggle("block2")}
+              className="w-full text-left px-5 py-4 group"
+            >
+              <div className="flex items-start gap-3">
+                <I.Repeat className="w-5 h-5 mt-0.5 text-indigo-900" />
+                <div className="flex-1">
+                  <div className="serif font-semibold text-[16px] text-slate-900">
+                    Block 2 — repeat with Generator B and Analyzer B
+                  </div>
+                  <div className="text-[12.5px] text-slate-600 mt-0.5">
+                    Same task structure as Block 1 · new repo from matched-pair pool · screenshots 6–10 collected.
+                  </div>
+                </div>
+                <I.ChevronDown className={`w-4 h-4 mt-1 text-slate-400 transition-transform ${isOpen("block2") ? "rotate-180" : ""}`} />
+              </div>
+
+              {isOpen("block2") && (
+                <div className="node-detail mt-4 pl-8 pr-1">
+                  <div className="border-l border-indigo-300 pl-3 text-[12.5px] text-slate-700 leading-relaxed space-y-2">
+                    <p>Block 2 mirrors Block 1 step-for-step but with the <em>complementary</em> generator and analyzer per the Latin-square row, and a fresh repo of comparable size/language drawn from the matched-pair pool.</p>
+                    <p>Mini-summary of repeated steps:</p>
+                    <ol className="list-decimal pl-5 space-y-0.5">
+                      <li>Qualtrics intro for Generator B → tool-specific lane → save SBOM.</li>
+                      <li>NASA-TLX + trust + perceived success (Generator B).</li>
+                      <li>Qualtrics intro for Analyzer B → tool-specific lane → record finding.</li>
+                      <li>NASA-TLX + trust + perceived success (Analyzer B).</li>
+                    </ol>
+                    <p>Screenshot indices 6–10 mirror 1–5; filenames are prefixed <span className="mono">P##_B2_</span>.</p>
+                  </div>
+                </div>
+              )}
+            </button>
+          </div>
+        </VStack>
+      </PhaseBand>
+
+      <Connector h={22} />
+
+      {/* ============================ PHASE IV ============================ */}
+      <PhaseBand phase={PHASES.P4}>
+        <VStack gap={16}>
+          <N id="comparative" icon={I.Hash} tone="emerald"
+             title="Qualtrics: Comparative Feedback Survey"
+             sub={<><QualtricsPlaceholder slot="COMPARATIVE" /> &nbsp;·&nbsp; generator pair, analyzer pair, decision confidence, open-ended</>}
+             instrument="qualtrics"
+             detail={
+               <div className="space-y-3 text-[12.5px]">
+                 <div className="flex items-center gap-2 flex-wrap">
+                   <span className="serif font-semibold text-slate-900">Comparative Feedback Survey — Qualtrics:</span>
+                   <QualtricsPlaceholder slot="COMPARATIVE" />
+                 </div>
+                 <div className="text-slate-600 italic leading-snug">Post-study survey. Likert items use <span className="font-semibold not-italic">Strongly Disagree → Strongly Agree</span> (7-pt).</div>
+
+                 <div className="bg-white border border-slate-200 rounded-sm p-3 space-y-1">
+                   <div className="text-[10.5px] uppercase tracking-[0.14em] text-slate-500 font-semibold">Section A — Generator Comparison <span className="text-slate-400 normal-case font-normal">(Syft vs V-Ops · 6 Likert items)</span></div>
+                   <ol className="list-decimal pl-5 serif text-slate-800 space-y-0.5">
+                     <li>The SBOM generation step was easy to complete with <b>Syft</b>.</li>
+                     <li>The SBOM generation step was easy to complete with <b>V-Ops</b>.</li>
+                     <li>I understood what the SBOM contained after using <b>Syft</b>.</li>
+                     <li>I understood what the SBOM contained after using <b>V-Ops</b>.</li>
+                     <li>I trust the output produced by <b>Syft</b>.</li>
+                     <li>I trust the output produced by <b>V-Ops</b>.</li>
+                   </ol>
+                 </div>
+
+                 <div className="bg-white border border-slate-200 rounded-sm p-3 space-y-1">
+                   <div className="text-[10.5px] uppercase tracking-[0.14em] text-slate-500 font-semibold">Section B — Analyzer Comparison <span className="text-slate-400 normal-case font-normal">(BOMbot vs Trustify · 6 Likert items)</span></div>
+                   <ol className="list-decimal pl-5 serif text-slate-800 space-y-0.5">
+                     <li>I was able to identify a vulnerable dependency using <b>BOMbot</b>.</li>
+                     <li>I was able to identify a vulnerable dependency using <b>Trustify</b>.</li>
+                     <li>The mitigation guidance was clear in <b>BOMbot</b>.</li>
+                     <li>The mitigation guidance was clear in <b>Trustify</b>.</li>
+                     <li>I trust the analysis output of <b>BOMbot</b>.</li>
+                     <li>I trust the analysis output of <b>Trustify</b>.</li>
+                   </ol>
+                 </div>
+
+                 <div className="bg-white border border-slate-200 rounded-sm p-3 space-y-1">
+                   <div className="text-[10.5px] uppercase tracking-[0.14em] text-slate-500 font-semibold">Section C — Decision Confidence <span className="text-slate-400 normal-case font-normal">(3 Likert items)</span></div>
+                   <ol className="list-decimal pl-5 serif text-slate-800 space-y-0.5">
+                     <li>I am confident I correctly identified a real vulnerability during the session.</li>
+                     <li>I am confident the mitigation I selected would actually resolve the vulnerability.</li>
+                     <li>I had enough information to make these decisions without guessing.</li>
+                   </ol>
+                 </div>
+
+                 <div className="bg-white border border-slate-200 rounded-sm p-3 space-y-1">
+                   <div className="text-[10.5px] uppercase tracking-[0.14em] text-slate-500 font-semibold">Forced-Choice Preferences <span className="text-slate-400 normal-case font-normal">(Q16–Q18)</span></div>
+                   <ol className="list-decimal pl-5 serif text-slate-800 space-y-1.5" start={16}>
+                     <li>
+                       If you had to generate an SBOM tomorrow for your own work, which tool would you choose?
+                       <ul className="list-disc pl-5 text-[12px] text-slate-600 mt-0.5"><li>Syft</li><li>V-Ops</li><li>Either, no preference</li></ul>
+                     </li>
+                     <li>
+                       If you had to triage SBOM vulnerabilities tomorrow, which tool would you choose?
+                       <ul className="list-disc pl-5 text-[12px] text-slate-600 mt-0.5"><li>BOMbot</li><li>Trustify</li><li>Either, no preference</li></ul>
+                     </li>
+                     <li>
+                       Compared to tools you have used before for managing software dependencies, today's tools were:
+                       <ul className="list-disc pl-5 text-[12px] text-slate-600 mt-0.5"><li>Much harder to use</li><li>Slightly harder</li><li>About the same</li><li>Slightly easier</li><li>Much easier</li></ul>
+                     </li>
+                   </ol>
+                 </div>
+
+                 <div className="bg-white border border-slate-200 rounded-sm p-3 space-y-1">
+                   <div className="text-[10.5px] uppercase tracking-[0.14em] text-slate-500 font-semibold">Section D — Open-Ended <span className="text-slate-400 normal-case font-normal">(Q19–Q22)</span></div>
+                   <ol className="list-decimal pl-5 serif text-slate-800 space-y-0.5" start={19}>
+                     <li>What part of the SBOM generation step was most confusing?</li>
+                     <li>What part of the vulnerability analysis step was most confusing?</li>
+                     <li>If you could change one thing about the workflow you went through today, what would it be?</li>
+                     <li>Any additional comments?</li>
+                   </ol>
+                 </div>
+               </div>
+             } />
+
+          <N id="debrief" icon={I.BookOpen} tone="emerald"
+             title="Researcher debrief"
+             sub="reveal aims, answer questions"
+             detail={<>Reveal: comparison of CLI vs hosted generator (Syft vs V-Ops) and dashboard vs LLM-chat analyzer (Trustify vs BOMbot). Provide reading list. Confirm right-to-withdraw audio/data.</>} />
+
+          <N id="compensation" icon={I.Gift} tone="emerald"
+             title="Compensation"
+             sub="$25 Amazon gift card (digital, on-the-spot)"
+             detail={<>Payment receipt logged in tracker; Prolific bonus released for Prolific-sourced participants.</>} />
+
+          <N id="end" icon={I.Flag} terminal
+             title="End of session" />
+        </VStack>
+      </PhaseBand>
+
+      <footer className="mt-12 pt-6 border-t border-slate-300 text-[11.5px] text-slate-600">
+        <div className="grid grid-cols-4 gap-6 mb-5">
+          <div>
+            <div className="num-tab text-[10px] uppercase tracking-[0.16em] text-slate-500 font-semibold mb-1">Session duration</div>
+            <div className="serif text-slate-900 text-[14px] leading-tight">≈ 65 minutes</div>
+            <div className="text-slate-500 mt-0.5">8 min screening · 50 min protocol · 7 min debrief / payout</div>
+          </div>
+          <div>
+            <div className="num-tab text-[10px] uppercase tracking-[0.16em] text-slate-500 font-semibold mb-1">Compensation</div>
+            <div className="serif text-slate-900 text-[14px] leading-tight">$25 Amazon gift card</div>
+            <div className="text-slate-500 mt-0.5">Digital, on-the-spot · Prolific bonus for online recruits · screen-out rate per Prolific policy</div>
+          </div>
+          <div>
+            <div className="num-tab text-[10px] uppercase tracking-[0.16em] text-slate-500 font-semibold mb-1"><Acr code="IRB" /> protocol</div>
+            <div className="serif text-slate-900 text-[14px] leading-tight">
+              <Acr code="UNCC" /> IRB&nbsp;
+              <span className="mono text-[12px] bg-amber-50 border border-amber-300 text-amber-900 px-1 rounded-sm">#XXX-XXXX</span>
+            </div>
+            <div className="text-slate-500 mt-0.5">Approved <span className="mono">YYYY-MM-DD</span> · expedited review · <Acr code="SIS" /> v1.2 on file <PlaceholderTag /></div>
+          </div>
+          <div>
+            <div className="num-tab text-[10px] uppercase tracking-[0.16em] text-slate-500 font-semibold mb-1">Study contact</div>
+            <div className="serif text-slate-900 text-[14px] leading-tight">Principal Investigator</div>
+            <div className="text-slate-500 mt-0.5">
+              <span className="mono">[name]@charlotte.edu</span> · Dept. of Software &amp; Information Systems
+            </div>
+            <div className="text-slate-500 mt-0.5">Research compliance: <span className="mono">uncc-irb@charlotte.edu</span></div>
+          </div>
+        </div>
+        <div className="flex items-center justify-between border-t border-slate-200 pt-3 text-[11px] text-slate-500">
+          <span className="mono">Fig. 1 · Participant flow · v1.1 · within-subjects 2 × 2 (Syft/V-Ops × BOMbot/Trustify) · Latin-square counterbalanced</span>
+          <span className="mono no-print">printed: <span id="print-date">{new Date().toISOString().slice(0,10)}</span></span>
+        </div>
+      </footer>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<StudyFlow />);
+</script>
+</body>
+</html>
